@@ -1,0 +1,9 @@
+domain: argoproj.io
+layout:
+- go.kubebuilder.io/v3
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: argocd-terraform-controller
+repo: github.com/sabre1041/argocd-terraform-controller
+version: "3"
