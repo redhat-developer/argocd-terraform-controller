@@ -5,7 +5,7 @@ metadata:
   name: terraform-viewer-role
 rules:
 - apiGroups:
-  - infra.argoproj.io
+  - argoproj.io
   resources:
   - terraforms
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - infra.argoproj.io
+  - argoproj.io
   resources:
   - terraforms/status
   verbs:

@@ -5,7 +5,7 @@ metadata:
   name: terraform-editor-role
 rules:
 - apiGroups:
-  - infra.argoproj.io
+  - argoproj.io
   resources:
   - terraforms
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - infra.argoproj.io
+  - argoproj.io
   resources:
   - terraforms/status
   verbs:

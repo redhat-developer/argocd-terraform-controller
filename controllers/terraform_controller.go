@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	infrav1alpha1 "github.com/sabre1041/argocd-terraform-controller/api/v1alpha1"
+	argoprojiov1alpha1 "github.com/sabre1041/argocd-terraform-controller/api/v1alpha1"
 )
 
 // TerraformReconciler reconciles a Terraform object
@@ -33,9 +33,9 @@ type TerraformReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=infra.argoproj.io,resources=terraforms,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=infra.argoproj.io,resources=terraforms/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=infra.argoproj.io,resources=terraforms/finalizers,verbs=update
+//+kubebuilder:rbac:groups=argoproj.io,resources=terraforms,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=argoproj.io,resources=terraforms/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=argoproj.io,resources=terraforms/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -57,6 +57,6 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 // SetupWithManager sets up the controller with the Manager.
 func (r *TerraformReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&infrav1alpha1.Terraform{}).
+		For(&argoprojiov1alpha1.Terraform{}).
 		Complete(r)
 }

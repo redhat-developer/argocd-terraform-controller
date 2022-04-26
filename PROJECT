@@ -12,7 +12,6 @@ resources:
     namespaced: true
   controller: true
   domain: argoproj.io
-  group: infra
   kind: Terraform
   path: github.com/sabre1041/argocd-terraform-controller/api/v1alpha1
   version: v1alpha1
