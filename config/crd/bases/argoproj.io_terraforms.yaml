@@ -80,19 +80,22 @@ spec:
                           (default: false)'
                         type: boolean
                       prune:
-                        description: 'Prune will prune resources automatically as
-                          part of automated sync (default: false)'
+                        description: 'Prune specifies whether to delete resources
+                          from the cluster that are not found in the sources anymore
+                          as part of automated sync (default: false)'
                         type: boolean
                       selfHeal:
-                        description: 'SelfHeal enables auto-syncing if  (default:
-                          false)'
+                        description: 'SelfHeal specifes whether to revert resources
+                          back to their desired state upon modification in the cluster
+                          (default: false)'
                         type: boolean
                     type: object
                   retry:
                     description: Retry controls failed sync retry behavior
                     properties:
                       backoff:
-                        description: Backoff is a backoff strategy
+                        description: Backoff controls how to backoff on subsequent
+                          retries of failed syncs
                         properties:
                           duration:
                             description: Duration is the amount to back off. Default
@@ -110,8 +113,8 @@ spec:
                             type: string
                         type: object
                       limit:
-                        description: Limit is the maximum number of attempts when
-                          retrying a container
+                        description: Limit is the maximum number of attempts for retrying
+                          a failed sync. If set to 0, no retries will be performed.
                         format: int64
                         type: integer
                     type: object
@@ -132,15 +135,16 @@ spec:
                 description: RevisionHistories is a array of history, oldest first
                   and newest last
                 items:
-                  description: RevisionHistory contains information relevant to an
-                    application deployment
+                  description: RevisionHistory contains history information about
+                    a previous sync
                   properties:
                     deployStartedAt:
-                      description: DeployStartedAt holds the time the deployment started
+                      description: DeployStartedAt holds the time the sync operation
+                        started
                       format: date-time
                       type: string
                     deployedAt:
-                      description: DeployedAt holds the time the deployment completed
+                      description: DeployedAt holds the time the sync operation completed
                       format: date-time
                       type: string
                     id:
@@ -148,30 +152,39 @@ spec:
                       format: int64
                       type: integer
                     revision:
-                      description: Revision holds the revision of the sync
+                      description: Revision holds the revision the sync was performed
+                        against
                       type: string
                     source:
-                      description: ApplicationSource contains information about github
-                        repository, path within repository and target application
-                        environment.
+                      description: Source is a reference to the application source
+                        used for the sync operation
                       properties:
                         chart:
-                          description: Chart is a Helm chart name
+                          description: Chart is a Helm chart name, and must be specified
+                            for applications sourced from a Helm repo.
                           type: string
                         directory:
                           description: Directory holds path/directory specific options
                           properties:
                             exclude:
+                              description: Exclude contains a glob pattern to match
+                                paths against that should be explicitly excluded from
+                                being used during manifest generation
+                              type: string
+                            include:
+                              description: Include contains a glob pattern to match
+                                paths against that should be explicitly included during
+                                manifest generation
                               type: string
                             jsonnet:
-                              description: ApplicationSourceJsonnet holds jsonnet
-                                specific options
+                              description: Jsonnet holds options specific to Jsonnet
                               properties:
                                 extVars:
                                   description: ExtVars is a list of Jsonnet External
                                     Variables
                                   items:
-                                    description: JsonnetVar is a jsonnet variable
+                                    description: JsonnetVar represents a variable
+                                      to be passed to jsonnet during manifest generation
                                     properties:
                                       code:
                                         type: boolean
@@ -193,7 +206,8 @@ spec:
                                   description: TLAS is a list of Jsonnet Top-level
                                     Arguments
                                   items:
-                                    description: JsonnetVar is a jsonnet variable
+                                    description: JsonnetVar represents a variable
+                                      to be passed to jsonnet during manifest generation
                                     properties:
                                       code:
                                         type: boolean
@@ -208,6 +222,8 @@ spec:
                                   type: array
                               type: object
                             recurse:
+                              description: Recurse specifies whether to scan a directory
+                                recursively for manifests
                               type: boolean
                           type: object
                         helm:
@@ -218,22 +234,29 @@ spec:
                                 helm template
                               items:
                                 description: HelmFileParameter is a file parameter
-                                  to a helm template
+                                  that's passed to helm template during manifest generation
                                 properties:
                                   name:
-                                    description: Name is the name of the helm parameter
+                                    description: Name is the name of the Helm parameter
                                     type: string
                                   path:
-                                    description: Path is the path value for the helm
-                                      parameter
+                                    description: Path is the path to the file containing
+                                      the values for the Helm parameter
                                     type: string
                                 type: object
                               type: array
+                            ignoreMissingValueFiles:
+                              description: IgnoreMissingValueFiles prevents helm template
+                                from failing when valueFiles do not exist locally
+                                by not appending them to helm template --values
+                              type: boolean
                             parameters:
-                              description: Parameters are parameters to the helm template
+                              description: Parameters is a list of Helm parameters
+                                which are passed to the helm template command upon
+                                manifest generation
                               items:
-                                description: HelmParameter is a parameter to a helm
-                                  template
+                                description: HelmParameter is a parameter that's passed
+                                  to helm template during manifest generation
                                 properties:
                                   forceString:
                                     description: ForceString determines whether to
@@ -241,17 +264,25 @@ spec:
                                       as strings
                                     type: boolean
                                   name:
-                                    description: Name is the name of the helm parameter
+                                    description: Name is the name of the Helm parameter
                                     type: string
                                   value:
-                                    description: Value is the value for the helm parameter
+                                    description: Value is the value for the Helm parameter
                                     type: string
                                 type: object
                               type: array
+                            passCredentials:
+                              description: PassCredentials pass credentials to all
+                                domains (Helm's --pass-credentials)
+                              type: boolean
                             releaseName:
-                              description: The Helm release name. If omitted it will
-                                use the application name
+                              description: ReleaseName is the Helm release name to
+                                use. If omitted it will use the application name
                               type: string
+                            skipCrds:
+                              description: SkipCrds skips custom resource definition
+                                installation step (Helm's --skip-crds)
+                              type: boolean
                             valueFiles:
                               description: ValuesFiles is a list of Helm value files
                                 to use when generating a template
@@ -259,12 +290,12 @@ spec:
                                 type: string
                               type: array
                             values:
-                              description: Values is Helm values, typically defined
-                                as a block
+                              description: Values specifies Helm values to be passed
+                                to helm template, typically defined as a block
                               type: string
                             version:
                               description: Version is the Helm version to use for
-                                templating with
+                                templating (either "2" or "3")
                               type: string
                           type: object
                         ksonnet:
@@ -299,47 +330,66 @@ spec:
                             commonAnnotations:
                               additionalProperties:
                                 type: string
-                              description: CommonAnnotations adds additional kustomize
-                                commonAnnotations
+                              description: CommonAnnotations is a list of additional
+                                annotations to add to rendered manifests
                               type: object
                             commonLabels:
                               additionalProperties:
                                 type: string
-                              description: CommonLabels adds additional kustomize
-                                commonLabels
+                              description: CommonLabels is a list of additional labels
+                                to add to rendered manifests
                               type: object
+                            forceCommonAnnotations:
+                              description: ForceCommonAnnotations specifies whether
+                                to force applying common annotations to resources
+                                for Kustomize apps
+                              type: boolean
+                            forceCommonLabels:
+                              description: ForceCommonLabels specifies whether to
+                                force applying common labels to resources for Kustomize
+                                apps
+                              type: boolean
                             images:
-                              description: Images are kustomize image overrides
+                              description: Images is a list of Kustomize image override
+                                specifications
                               items:
+                                description: KustomizeImage represents a Kustomize
+                                  image definition in the format [old_image_name=]<image_name>:<image_tag>
                                 type: string
                               type: array
                             namePrefix:
                               description: NamePrefix is a prefix appended to resources
-                                for kustomize apps
+                                for Kustomize apps
                               type: string
                             nameSuffix:
                               description: NameSuffix is a suffix appended to resources
-                                for kustomize apps
+                                for Kustomize apps
                               type: string
                             version:
-                              description: Version contains optional Kustomize version
+                              description: Version controls which version of Kustomize
+                                to use for rendering manifests
                               type: string
                           type: object
                         path:
-                          description: Path is a directory path within the Git repository
+                          description: Path is a directory path within the Git repository,
+                            and is only valid for applications sourced from Git.
                           type: string
                         plugin:
                           description: ConfigManagementPlugin holds config management
                             plugin specific options
                           properties:
                             env:
+                              description: Env is a list of environment variable entries
                               items:
+                                description: EnvEntry represents an entry in the application's
+                                  environment
                                 properties:
                                   name:
-                                    description: the name, usually uppercase
+                                    description: Name is the name of the variable,
+                                      usually expressed in uppercase
                                     type: string
                                   value:
-                                    description: the value
+                                    description: Value is the value of the variable
                                     type: string
                                 required:
                                 - name
@@ -350,13 +400,15 @@ spec:
                               type: string
                           type: object
                         repoURL:
-                          description: RepoURL is the repository URL of the application
-                            manifests
+                          description: RepoURL is the URL to the repository (Git or
+                            Helm) that contains the application manifests
                           type: string
                         targetRevision:
-                          description: TargetRevision defines the commit, tag, or
-                            branch in which to sync the application to. If omitted,
-                            will sync to HEAD
+                          description: TargetRevision defines the revision of the
+                            source to sync the application to. In case of Git, this
+                            can be commit, tag, or branch. If omitted, will equal
+                            to HEAD. In case of Helm, this is a semver tag for the
+                            Chart's version.
                           type: string
                       required:
                       - repoURL
@@ -378,52 +430,62 @@ spec:
                   Failed'
                 type: string
               sync:
-                description: SyncStatus is a comparison result of application spec
-                  and deployed application.
+                description: SyncStatus contains information about the currently observed
+                  live and desired states of an application
                 properties:
                   comparedTo:
-                    description: ComparedTo contains application source and target
-                      which was used for resources comparison
+                    description: ComparedTo contains information about what has been
+                      compared
                     properties:
                       destination:
-                        description: ApplicationDestination contains deployment destination
-                          information
+                        description: Destination is a reference to the application's
+                          destination used for comparison
                         properties:
                           name:
-                            description: Name of the destination cluster which can
-                              be used instead of server (url) field
+                            description: Name is an alternate way of specifying the
+                              target cluster by its symbolic name
                             type: string
                           namespace:
-                            description: Namespace overrides the environment namespace
-                              value in the ksonnet app.yaml
+                            description: Namespace specifies the target namespace
+                              for the application's resources. The namespace will
+                              only be set for namespace-scoped resources that have
+                              not set a value for .metadata.namespace
                             type: string
                           server:
-                            description: Server overrides the environment server value
-                              in the ksonnet app.yaml
+                            description: Server specifies the URL of the target cluster
+                              and must be set to the Kubernetes control plane API
                             type: string
                         type: object
                       source:
-                        description: ApplicationSource contains information about
-                          github repository, path within repository and target application
-                          environment.
+                        description: Source is a reference to the application's source
+                          used for comparison
                         properties:
                           chart:
-                            description: Chart is a Helm chart name
+                            description: Chart is a Helm chart name, and must be specified
+                              for applications sourced from a Helm repo.
                             type: string
                           directory:
                             description: Directory holds path/directory specific options
                             properties:
                               exclude:
+                                description: Exclude contains a glob pattern to match
+                                  paths against that should be explicitly excluded
+                                  from being used during manifest generation
+                                type: string
+                              include:
+                                description: Include contains a glob pattern to match
+                                  paths against that should be explicitly included
+                                  during manifest generation
                                 type: string
                               jsonnet:
-                                description: ApplicationSourceJsonnet holds jsonnet
-                                  specific options
+                                description: Jsonnet holds options specific to Jsonnet
                                 properties:
                                   extVars:
                                     description: ExtVars is a list of Jsonnet External
                                       Variables
                                     items:
-                                      description: JsonnetVar is a jsonnet variable
+                                      description: JsonnetVar represents a variable
+                                        to be passed to jsonnet during manifest generation
                                       properties:
                                         code:
                                           type: boolean
@@ -445,7 +507,8 @@ spec:
                                     description: TLAS is a list of Jsonnet Top-level
                                       Arguments
                                     items:
-                                      description: JsonnetVar is a jsonnet variable
+                                      description: JsonnetVar represents a variable
+                                        to be passed to jsonnet during manifest generation
                                       properties:
                                         code:
                                           type: boolean
@@ -460,6 +523,8 @@ spec:
                                     type: array
                                 type: object
                               recurse:
+                                description: Recurse specifies whether to scan a directory
+                                  recursively for manifests
                                 type: boolean
                             type: object
                           helm:
@@ -470,23 +535,30 @@ spec:
                                   the helm template
                                 items:
                                   description: HelmFileParameter is a file parameter
-                                    to a helm template
+                                    that's passed to helm template during manifest
+                                    generation
                                   properties:
                                     name:
-                                      description: Name is the name of the helm parameter
+                                      description: Name is the name of the Helm parameter
                                       type: string
                                     path:
-                                      description: Path is the path value for the
-                                        helm parameter
+                                      description: Path is the path to the file containing
+                                        the values for the Helm parameter
                                       type: string
                                   type: object
                                 type: array
+                              ignoreMissingValueFiles:
+                                description: IgnoreMissingValueFiles prevents helm
+                                  template from failing when valueFiles do not exist
+                                  locally by not appending them to helm template --values
+                                type: boolean
                               parameters:
-                                description: Parameters are parameters to the helm
-                                  template
+                                description: Parameters is a list of Helm parameters
+                                  which are passed to the helm template command upon
+                                  manifest generation
                                 items:
-                                  description: HelmParameter is a parameter to a helm
-                                    template
+                                  description: HelmParameter is a parameter that's
+                                    passed to helm template during manifest generation
                                   properties:
                                     forceString:
                                       description: ForceString determines whether
@@ -494,18 +566,26 @@ spec:
                                         as strings
                                       type: boolean
                                     name:
-                                      description: Name is the name of the helm parameter
+                                      description: Name is the name of the Helm parameter
                                       type: string
                                     value:
-                                      description: Value is the value for the helm
+                                      description: Value is the value for the Helm
                                         parameter
                                       type: string
                                   type: object
                                 type: array
+                              passCredentials:
+                                description: PassCredentials pass credentials to all
+                                  domains (Helm's --pass-credentials)
+                                type: boolean
                               releaseName:
-                                description: The Helm release name. If omitted it
-                                  will use the application name
+                                description: ReleaseName is the Helm release name
+                                  to use. If omitted it will use the application name
                                 type: string
+                              skipCrds:
+                                description: SkipCrds skips custom resource definition
+                                  installation step (Helm's --skip-crds)
+                                type: boolean
                               valueFiles:
                                 description: ValuesFiles is a list of Helm value files
                                   to use when generating a template
@@ -513,12 +593,12 @@ spec:
                                   type: string
                                 type: array
                               values:
-                                description: Values is Helm values, typically defined
-                                  as a block
+                                description: Values specifies Helm values to be passed
+                                  to helm template, typically defined as a block
                                 type: string
                               version:
                                 description: Version is the Helm version to use for
-                                  templating with
+                                  templating (either "2" or "3")
                                 type: string
                             type: object
                           ksonnet:
@@ -553,47 +633,67 @@ spec:
                               commonAnnotations:
                                 additionalProperties:
                                   type: string
-                                description: CommonAnnotations adds additional kustomize
-                                  commonAnnotations
+                                description: CommonAnnotations is a list of additional
+                                  annotations to add to rendered manifests
                                 type: object
                               commonLabels:
                                 additionalProperties:
                                   type: string
-                                description: CommonLabels adds additional kustomize
-                                  commonLabels
+                                description: CommonLabels is a list of additional
+                                  labels to add to rendered manifests
                                 type: object
+                              forceCommonAnnotations:
+                                description: ForceCommonAnnotations specifies whether
+                                  to force applying common annotations to resources
+                                  for Kustomize apps
+                                type: boolean
+                              forceCommonLabels:
+                                description: ForceCommonLabels specifies whether to
+                                  force applying common labels to resources for Kustomize
+                                  apps
+                                type: boolean
                               images:
-                                description: Images are kustomize image overrides
+                                description: Images is a list of Kustomize image override
+                                  specifications
                                 items:
+                                  description: KustomizeImage represents a Kustomize
+                                    image definition in the format [old_image_name=]<image_name>:<image_tag>
                                   type: string
                                 type: array
                               namePrefix:
                                 description: NamePrefix is a prefix appended to resources
-                                  for kustomize apps
+                                  for Kustomize apps
                                 type: string
                               nameSuffix:
                                 description: NameSuffix is a suffix appended to resources
-                                  for kustomize apps
+                                  for Kustomize apps
                                 type: string
                               version:
-                                description: Version contains optional Kustomize version
+                                description: Version controls which version of Kustomize
+                                  to use for rendering manifests
                                 type: string
                             type: object
                           path:
-                            description: Path is a directory path within the Git repository
+                            description: Path is a directory path within the Git repository,
+                              and is only valid for applications sourced from Git.
                             type: string
                           plugin:
                             description: ConfigManagementPlugin holds config management
                               plugin specific options
                             properties:
                               env:
+                                description: Env is a list of environment variable
+                                  entries
                                 items:
+                                  description: EnvEntry represents an entry in the
+                                    application's environment
                                   properties:
                                     name:
-                                      description: the name, usually uppercase
+                                      description: Name is the name of the variable,
+                                        usually expressed in uppercase
                                       type: string
                                     value:
-                                      description: the value
+                                      description: Value is the value of the variable
                                       type: string
                                   required:
                                   - name
@@ -604,13 +704,15 @@ spec:
                                 type: string
                             type: object
                           repoURL:
-                            description: RepoURL is the repository URL of the application
-                              manifests
+                            description: RepoURL is the URL to the repository (Git
+                              or Helm) that contains the application manifests
                             type: string
                           targetRevision:
-                            description: TargetRevision defines the commit, tag, or
-                              branch in which to sync the application to. If omitted,
-                              will sync to HEAD
+                            description: TargetRevision defines the revision of the
+                              source to sync the application to. In case of Git, this
+                              can be commit, tag, or branch. If omitted, will equal
+                              to HEAD. In case of Helm, this is a semver tag for the
+                              Chart's version.
                             type: string
                         required:
                         - repoURL
@@ -620,10 +722,11 @@ spec:
                     - source
                     type: object
                   revision:
+                    description: Revision contains information about the revision
+                      the comparison has been performed to
                     type: string
                   status:
-                    description: SyncStatusCode is a type which represents possible
-                      comparison results
+                    description: Status is the sync state of the comparison
                     type: string
                 required:
                 - status
