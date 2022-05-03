@@ -32,7 +32,7 @@ jobs:
         run: make docker-build IMG=${CONTROLLER_IMAGE}
 
       - name: Export container image
-        run: docker save -o /tmp/operator.tar ${CONTROLLER_IMAGE}
+        run: docker save -o /tmp/controller.tar ${CONTROLLER_IMAGE}
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
