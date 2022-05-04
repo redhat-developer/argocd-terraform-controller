@@ -85,3 +85,32 @@ jobs:
 
     - name: run e2e tests
       run: make test-e2e
+
+  push-controller:
+    name: Push controller image to registry
+    needs: [build-controller, deploy]
+    if: >
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Load container artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: controller
+          path: /tmp
+
+      - name: Import container image
+        run: |
+          docker load -i /tmp/controller.tar
+          docker inspect ${CONTROLLER_IMAGE}
+
+      - name: Login to the registry
+        run: |
+          [[ "${CONTROLLER_IMAGE}" =~ ^([^/]+)/[^/]+/[^/]+ ]] && REGISTRY="${BASH_REMATCH[1]}" || REGISTRY="quay.io"
+          echo "Attempting docker login to: ${REGISTRY}"
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
+   
+      - name: Push to registry (latest)
+        run: docker push "${CONTROLLER_IMAGE}"
