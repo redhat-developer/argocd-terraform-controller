@@ -68,6 +68,17 @@ Failed
 */
 type TerraformStage string
 
+// type returned from terraform-generate plugin
+type TerraformWrapper struct {
+	metav1.TypeMeta `json:",inline"`
+	List            []TerraformFile `json:"list,omitempty"`
+}
+
+type TerraformFile struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
+}
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 

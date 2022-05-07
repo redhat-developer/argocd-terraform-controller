@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+data:
+  configManagementPlugins: |
+    - name: argocd-terraform-generator
+      generate:
+        command: ["argocd-terraform-generator"]
+        args: []

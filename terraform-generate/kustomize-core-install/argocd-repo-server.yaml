@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-repo-server
+spec:
+  template:
+    spec:
+      containers:
+      - name: argocd-repo-server
+        volumeMounts:
+        - name: custom-tools
+          mountPath: /usr/local/bin/argocd-terraform-generator
+          subPath: argocd-terraform-generator
+      volumes:
+      - name: custom-tools
+        emptyDir: {}
+      initContainers:
+      - name: download-tools
+        image: alpine:3.8
+        command: [sh, -c]
+        args:
+          - >-
+            wget -O argocd-terraform-generator
+            https://raw.githubusercontent.com/sabre1041/argocd-terraform-controller/main/terraform-generate/generate.sh &&
+            chmod +x argocd-terraform-generator &&
+            mv argocd-terraform-generator /custom-tools/
+        volumeMounts:
+          - mountPath: /custom-tools
+            name: custom-tools
