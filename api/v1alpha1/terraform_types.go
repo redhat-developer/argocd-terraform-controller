@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,14 +29,54 @@ type TerraformSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Terraform. Edit terraform_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Source               TerraformSource      `json:"source"`
+	Project              string               `json:"project"`
+	SyncPolicy           *v1alpha1.SyncPolicy `json:"syncPolicy,omitempty"`
+	Info                 []v1alpha1.Info      `json:"info,omitempty"`
+	RevisionHistoryLimit *int64               `json:"revisionHistoryLimit,omitempty"`
+}
+
+type TerraformSource struct {
+	RepoURL         string           `json:"repoURL"`
+	Path            string           `json:"path,omitempty"`
+	TargetRevision  string           `json:"targetRevision,omitempty"`
+	Destroy         bool             `json:"destroy,omitempty"`
+	RefreshInterval *metav1.Duration `json:"refreshInterval,omitempty"`
 }
 
 // TerraformStatus defines the observed state of Terraform
 type TerraformStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	State        TerraformState             `json:"state,omitempty"`
+	Stage        TerraformStage             `json:"status,omitempty"`
+	SyncStatus   v1alpha1.SyncStatus        `json:"sync,omitempty"`
+	History      v1alpha1.RevisionHistories `json:"history,omitempty"`
+	ReconciledAt *metav1.Time               `json:"reconciledAt,omitempty"`
+}
+
+// path of file containing terraform state
+type TerraformState string
+
+/* This could be:
+Initializing
+Planning
+Applying
+Destroying
+Failed
+*/
+type TerraformStage string
+
+// type returned from terraform-generate plugin
+type TerraformWrapper struct {
+	metav1.TypeMeta `json:",inline"`
+	List            []TerraformFile `json:"list,omitempty"`
+}
+
+type TerraformFile struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
 }
 
 //+kubebuilder:object:root=true
