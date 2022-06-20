@@ -1,11 +1,4 @@
-foo=($(find . -iname '*.tf'))
-declare -a contentarr
-for i in "${foo[@]::${#foo[@]}-1}"; do
-  content=$(echo "{\"name\":\""$i"\",\"content\":\"$(echo $(cat $i | base64))\"},")
-  contentarr+=$content
-done
-for i in "${foo[@]: -1:1}"; do
-  content=$(echo "{\"name\":\""$i"\",\"content\":\"$(echo $(cat $i | base64))\"}")
-  contentarr+=$content
-done
-echo "{\"apiVersion\": \"v1\", \"kind\": \"TerraformWrapper\", \"list\": [$contentarr]}"
+#!/bin/bash
+cd ..
+kubectl create configmap -n $ARGOCD_APP_NAMESPACE $ARGOCD_APP_NAME-terraform --from-file=$ARGOCD_APP_SOURCE_PATH -o json --dry-run
+echo "{\"apiVersion\": \"argoproj.io/v1alpha1\", \"kind\": \"Terraform\", \"metadata\": {\"name\": \"$ARGOCD_APP_NAME\", \"namespace\": \"$ARGOCD_APP_NAMESPACE\"}, \"spec\": {\"revision\": \"$ARGOCD_APP_REVISION\", \"completed\": false}}"
