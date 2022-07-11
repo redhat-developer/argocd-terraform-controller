@@ -150,6 +150,27 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
+.PHONY: deploy-file
+deploy-file: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default > controller.yaml
+
+.PHONY: podman-build
+podman-build: test ## Build docker image with the manager.
+	podman build -t ${IMG} .
+
+.PHONY: podman-push
+podman-push: test ## Build docker image with the manager.
+	podman push ${IMG}
+
+.PHONY: podman-build-no-test
+podman-build-no-test: ## Build docker image with the manager.
+	podman build -t ${IMG} .
+
+.PHONY: podman-push-no-test
+podman-push-no-test: ## Build docker image with the manager.
+	podman push ${IMG}
+
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -

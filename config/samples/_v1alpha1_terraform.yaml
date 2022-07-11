@@ -3,4 +3,8 @@ kind: Terraform
 metadata:
   name: terraform-sample
 spec:
-  # TODO(user): Add fields here
+  source:
+    repoURL: https://github.com/sabre1041/argocd-terraform-controller.git
+    path: testing/terraform
+    targetRevision: main
+  project: default
