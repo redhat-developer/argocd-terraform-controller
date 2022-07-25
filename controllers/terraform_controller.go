@@ -249,7 +249,7 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				{
 					Name:    "terraform-controller-worker-" + req.Name,
 					Image:   image,
-					Command: []string{"/usr/local/bin/terraform-controller-worker"},
+					Command: []string{"/usr/local/bin/worker"},
 					Args:    []string{req.Namespace, req.Name},
 					VolumeMounts: []corev1.VolumeMount{
 						{
@@ -279,6 +279,7 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: req.Name + "-terraform",
 							},
+							Optional: &optional,
 						},
 					},
 				},

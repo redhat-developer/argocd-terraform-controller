@@ -171,6 +171,10 @@ podman-push: ## Build docker image with the manager.
 podman-build-no-test: manifests generate fmt ## Build docker image with the manager.
 	podman build -t ${IMG} .
 
+.PHONY: podman-build-worker-no-test
+podman-build-worker-no-test: manifests generate fmt ## Build docker image with the manager.
+	podman build -f worker.Dockerfile -t ${IMG} .
+
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
