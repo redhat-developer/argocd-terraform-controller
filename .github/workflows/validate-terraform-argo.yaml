@@ -112,5 +112,8 @@ jobs:
           echo "Attempting docker login to: ${REGISTRY}"
           echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
    
-      - name: Push to registry (latest)
-        run: docker push "${CONTROLLER_IMAGE}"
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: "${CONTROLLER_IMAGE}"
