@@ -28,7 +28,7 @@ spec:
         runAsNonRoot: true
       containers:
       - command:
-        - /argocd-terraform-controller
+        - /manager
         args:
         - --leader-elect
         image: controller:latest
