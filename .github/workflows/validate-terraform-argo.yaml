@@ -89,22 +89,21 @@ jobs:
   push-controller:
     name: Push controller image to registry
     needs: [build-controller, deploy]
+    runs-on: ubuntu-20.04
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    runs-on: ubuntu-20.04
-
     steps:
-      - name: Load container artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: controller
-          path: /tmp
+      - name: Check out code
+        uses: actions/checkout@v2
 
-      - name: Import container image
-        run: |
-          docker load -i /tmp/controller.tar
-          docker inspect ${CONTROLLER_IMAGE}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+        with:
+          buildkitd-flags: --debug
 
       - name: Login to the registry
         run: |
@@ -112,8 +111,11 @@ jobs:
           echo "Attempting docker login to: ${REGISTRY}"
           echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
    
-      - name: Build and push
-        uses: docker/build-push-action@v3
+      - name: "Build Operator Image"
+        uses: docker/build-push-action@v2
         with:
+          context: .
+          file: "./Dockerfile"
+          platforms: "linux/amd64,linux/arm64"
           push: true
-          tags: "${CONTROLLER_IMAGE}"
+          tags: ${{ env.CONTROLLER_IMAGE }}

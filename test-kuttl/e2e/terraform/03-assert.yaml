@@ -6,7 +6,7 @@ timeout: 200
 apiVersion: apps/v1
 kind: Deployment 
 metadata:
-  name: argocd-server
+  name: argocd-redis
   namespace: argocd
 status:
   availableReplicas: 1
