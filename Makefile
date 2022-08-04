@@ -1,3 +1,5 @@
+KUTTL_VERSION := 0.12.1
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -29,7 +31,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # argoproj.io/argocd-terraform-controller-bundle:$VERSION and argoproj.io/argocd-terraform-controller-catalog:$VERSION.
-IMAGE_TAG_BASE ?= argoproj.io/argocd-terraform-controller
+IMAGE_TAG_BASE ?= quay.io/ablock/argocd-terraform-controller
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -47,7 +49,7 @@ ifeq ($(USE_IMAGE_DIGESTS), true)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= quay.io/ablock/argocd-terraform-controller
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.23
 
@@ -105,6 +107,11 @@ vet: ## Run go vet against code.
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
+
+.PHONY: test-e2e
+test-e2e: kuttl ## Run e2e tests. Requires cluster w/ Scribe already installed
+	cd test-kuttl && $(KUTTL) test --namespace argocd
+	rm -f test-kuttl/kubeconfig
 
 ##@ Build
 
@@ -252,3 +259,19 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+# download-tool will curl any file $2 and install it to $1.
+define download-tool
+@[ -f $(1) ] || { \
+set -e ;\
+echo "Downloading $(2)" ;\
+curl -sSLo "$(1)" "$(2)" ;\
+chmod a+x "$(1)" ;\
+}
+endef
+
+.PHONY: kuttl
+KUTTL := $(PROJECT_DIR)/bin/kuttl
+KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_linux_x86_64
+kuttl: ## Download kuttl
+	$(call download-tool,$(KUTTL),$(KUTTL_URL))
