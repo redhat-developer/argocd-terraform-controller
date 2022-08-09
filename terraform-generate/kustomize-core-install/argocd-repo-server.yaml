@@ -11,6 +11,9 @@ spec:
         - name: custom-tools
           mountPath: /usr/local/bin/argocd-terraform-generator
           subPath: argocd-terraform-generator
+        - name: custom-tools
+          mountPath: /usr/local/bin/kubectl
+          subPath: kubectl
       volumes:
       - name: custom-tools
         emptyDir: {}
@@ -20,6 +23,9 @@ spec:
         command: [sh, -c]
         args:
           - >-
+            wget -O kubectl https://storage.googleapis.com/kubernetes-release/release/v1.24.1/bin/linux/amd64/kubectl &&
+            chmod +x ./kubectl &&
+            mv ./kubectl /custom-tools/ && 
             wget -O argocd-terraform-generator
             https://raw.githubusercontent.com/sabre1041/argocd-terraform-controller/main/terraform-generate/generate.sh &&
             chmod +x argocd-terraform-generator &&

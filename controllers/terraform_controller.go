@@ -18,20 +18,27 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
+	"os"
+	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/argoproj/argo-cd/v2/common"
-	"github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
-	"github.com/argoproj/argo-cd/v2/reposerver/apiclient"
-	"github.com/argoproj/argo-cd/v2/util/io"
 	argoprojiov1alpha1 "github.com/sabre1041/argocd-terraform-controller/api/v1alpha1"
 )
 
@@ -44,6 +51,13 @@ type TerraformReconciler struct {
 //+kubebuilder:rbac:groups=argoproj.io,resources=terraforms,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=argoproj.io,resources=terraforms/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=argoproj.io,resources=terraforms/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -58,77 +72,252 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	l := log.FromContext(ctx)
 
 	terraform := &argoprojiov1alpha1.Terraform{}
-	_ = r.Get(ctx, req.NamespacedName, terraform)
 
-	l.Info("Reconciling", "name", terraform.Name, "url", terraform.Spec.Source.RepoURL)
+	l.Info(fmt.Sprintf("Req Namespaced names: %+v", req.NamespacedName))
 
-	// default TLS settings
-	// TODO: get the TLS config the same way the application controller does
-	tlsConfig := apiclient.TLSConfiguration{
-		DisableTLS:       false,
-		StrictValidation: false,
-	}
-
-	repoClientSet := apiclient.NewRepoServerClientset(common.DefaultRepoServerAddr, 60, tlsConfig)
-
-	// This creates a client to make gRPC calls to the repo server
-	conn, repoClient, err := repoClientSet.NewRepoServerClient()
+	err := r.Get(ctx, req.NamespacedName, terraform)
 	if err != nil {
-		l.Error(err, "error getting repo server client")
+		l.Error(err, "Error getting Terraform resource to reconcile")
 		return ctrl.Result{}, err
 	}
-	defer io.Close(conn)
 
-	// TODO: call GenerateManifests the same way the application controller does
-	manifestInfo, err := repoClient.GenerateManifest(context.Background(), &apiclient.ManifestRequest{
-		Repo: &v1alpha1.Repository{
-			Repo: terraform.Spec.Source.RepoURL,
+	image := "quay.io/jsawaya/terraform-controller-worker:latest"
+	workerImageEnvVar, workerImageEnvVarExists := os.LookupEnv("WORKER_IMG")
+	if workerImageEnvVarExists {
+		image = workerImageEnvVar
+	}
+
+	role := &rbacv1.Role{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Role",
+			APIVersion: "rbac.authorization.k8s.io/v1",
 		},
-		NoCache: true,
-		ApplicationSource: &v1alpha1.ApplicationSource{
-			RepoURL:        terraform.Spec.Source.RepoURL,
-			Path:           terraform.Spec.Source.Path,
-			TargetRevision: terraform.Spec.Source.TargetRevision,
-			Plugin: &v1alpha1.ApplicationSourcePlugin{
-				Name: "argocd-terraform-generator",
-			},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "argocd-terraform-worker-role",
+			Namespace: req.Namespace,
 		},
-		Plugins: []*v1alpha1.ConfigManagementPlugin{
+		Rules: []rbacv1.PolicyRule{
 			{
-				Name: "argocd-terraform-generator",
-				Generate: v1alpha1.Command{
-					Command: []string{"bash", "-c"},
-					Args:    []string{"argocd-terraform-generator"},
+				APIGroups: []string{
+					"argoproj.io",
+				},
+				Resources: []string{
+					"terraforms",
+				},
+				Verbs: []string{
+					"get",
+					"patch",
+				},
+			},
+			{
+				APIGroups: []string{
+					"",
+				},
+				Resources: []string{
+					"pods",
+				},
+				Verbs: []string{
+					"get",
+					"create",
+					"list",
+					"patch",
+					"update",
+					"delete",
+					"watch",
+				},
+			},
+			{
+				APIGroups: []string{
+					"",
+				},
+				Resources: []string{
+					"secrets",
+				},
+				Verbs: []string{
+					"get",
+					"create",
+					"list",
+					"update",
+				},
+			},
+			{
+				APIGroups: []string{
+					"coordination.k8s.io",
+				},
+				Resources: []string{
+					"leases",
+				},
+				Verbs: []string{
+					"get",
+					"create",
+					"update",
 				},
 			},
 		},
-	})
+	}
+
+	err = r.Get(ctx, types.NamespacedName{
+		Name:      "argocd-terraform-worker-role",
+		Namespace: req.Namespace,
+	}, &rbacv1.Role{})
 	if err != nil {
-		l.Error(err, "error generating manifests")
+		if client.IgnoreNotFound(err) != nil {
+			l.Error(err, "Error getting Terraform resource to reconcile")
+			return ctrl.Result{}, err
+		} else {
+			err := r.Create(ctx, role)
+			if err != nil {
+				l.Error(err, "Error creating role")
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
+	serviceAccount := &corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "argocd-terraform-worker",
+			Namespace: req.Namespace,
+		},
+	}
+	err = r.Get(ctx, types.NamespacedName{
+		Name:      "argocd-terraform-worker",
+		Namespace: req.Namespace,
+	}, &corev1.ServiceAccount{})
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			l.Error(err, "Error getting Terraform resource to reconcile")
+			return ctrl.Result{}, err
+		} else {
+			err := r.Create(ctx, serviceAccount)
+			if err != nil {
+				l.Error(err, "Error creating serviceAccount")
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
+	roleBinding := &rbacv1.RoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "RoleBinding",
+			APIVersion: "rbac.authorization.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "argocd-terraform-worker-rolebinding",
+			Namespace: req.Namespace,
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     "argocd-terraform-worker-role",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "argocd-terraform-worker",
+				Namespace: req.Namespace,
+			},
+		},
+	}
+
+	err = r.Get(ctx, types.NamespacedName{
+		Name:      "argocd-terraform-worker-rolebinding",
+		Namespace: req.Namespace,
+	}, &rbacv1.RoleBinding{})
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			l.Error(err, "Error getting Terraform resource to reconcile")
+			return ctrl.Result{}, err
+		} else {
+			err := r.Create(ctx, roleBinding)
+			if err != nil {
+				l.Error(err, "Error creating role binding")
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
+	optional := true
+	pod := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "worker-pod-" + req.Name,
+			Namespace: req.Namespace,
+			Labels: map[string]string{
+				"argoproj.io/worker": "true",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:    "terraform-controller-worker-" + req.Name,
+					Image:   image,
+					Command: []string{"/usr/local/bin/worker"},
+					Args:    []string{req.Namespace, req.Name},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "files",
+							MountPath: "/opt/manifests/config",
+						},
+					},
+					EnvFrom: []corev1.EnvFromSource{
+						{
+							SecretRef: &corev1.SecretEnvSource{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "argocd-terraform-credentials",
+								},
+								Optional: &optional,
+							},
+						},
+					},
+				},
+			},
+			ServiceAccountName: "argocd-terraform-worker",
+			RestartPolicy:      corev1.RestartPolicyOnFailure,
+			Volumes: []corev1.Volume{
+				{
+					Name: "files",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: req.Name + "-terraform",
+							},
+							Optional: &optional,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	existingPod := &corev1.Pod{}
+
+	err = r.Get(ctx, client.ObjectKeyFromObject(pod), existingPod)
+	if client.IgnoreNotFound(err) != nil {
 		return ctrl.Result{}, err
 	}
 
-	terraformFiles := make([]argoprojiov1alpha1.TerraformFile, 0)
-	for _, manifest := range manifestInfo.Manifests {
-		obj, err := v1alpha1.UnmarshalToUnstructured(manifest)
+	if existingPod.ObjectMeta.Name != "" {
+		err = r.Delete(ctx, pod)
 		if err != nil {
-			l.Error(err, "error unmarshaling to unstructured")
+			l.Error(err, "Error deleting pod")
 			return ctrl.Result{}, err
 		}
-		if obj.GetKind() == "TerraformWrapper" {
-			var wrapper argoprojiov1alpha1.TerraformWrapper
-			err := json.Unmarshal([]byte(manifest), &wrapper)
-			if err != nil {
-				l.Error(err, "Error unmarshaling manifest into wrapper")
-			}
-			terraformFiles = wrapper.List
-		} else {
-			l.Error(nil, "Only expected kubernetes objects of kind: TerraformWrapper")
-			return ctrl.Result{}, errors.New("only expected kubernetes objects of kind: TerraformWrapper")
+		l.Info("Deleted")
+	} else {
+		err = r.Create(ctx, pod)
+		if err != nil {
+			l.Error(err, "Error creating pod")
+			return ctrl.Result{}, err
 		}
+		l.Info("Created")
 	}
-
-	l.Info(fmt.Sprintf("%+v", terraformFiles))
 
 	return ctrl.Result{}, nil
 }
@@ -137,5 +326,41 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func (r *TerraformReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&argoprojiov1alpha1.Terraform{}).
+		Watches(
+			&source.Kind{Type: &corev1.Pod{}},
+			handler.EnqueueRequestsFromMapFunc(r.filterFinishedWorkerPods),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
+}
+
+func (r *TerraformReconciler) filterFinishedWorkerPods(pod client.Object) []reconcile.Request {
+
+	pl := &corev1.PodList{}
+	requirement, err := labels.NewRequirement("argoproj.io/worker", selection.Exists, []string{})
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	ls := labels.NewSelector().Add(*requirement)
+	listOps := &client.ListOptions{
+		LabelSelector: ls,
+		Namespace:     pod.GetNamespace(),
+	}
+	err = r.List(context.TODO(), pl, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+	requests := make([]reconcile.Request, 0)
+	for _, item := range pl.Items {
+		if item.Status.Phase == corev1.PodSucceeded && item.DeletionTimestamp.IsZero() {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      strings.TrimPrefix(item.GetName(), "worker-pod-"),
+					Namespace: item.GetNamespace(),
+				},
+			})
+		}
+	}
+	return requests
 }
