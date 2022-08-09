@@ -8,15 +8,12 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 
 	"github.com/otiai10/copy"
 	argoprojiov1alpha1 "github.com/sabre1041/argocd-terraform-controller/api/v1alpha1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 var (
@@ -40,14 +37,6 @@ var RootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		namespace := args[0]
 		name := args[1]
-
-		cl, err := client.New(config.GetConfigOrDie(), client.Options{
-			Scheme: scheme,
-		})
-		if err != nil {
-			fmt.Println("failed to create client")
-			os.Exit(1)
-		}
 
 		ctx := context.Background()
 
@@ -89,21 +78,6 @@ terraform {
 			klog.Errorf("error running Apply: %s", err)
 		}
 
-		terra := argoprojiov1alpha1.Terraform{}
-
-		err = cl.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &terra)
-		if err != nil {
-			klog.Errorf("Error getting %s: %v", name, err)
-		}
-
-		newTerra := terra.DeepCopy()
-
-		newTerra.Spec.Completed = true
-
-		err = cl.Patch(ctx, newTerra, client.MergeFrom(terra.DeepCopy()))
-		if err != nil {
-			klog.Errorf("Error patching %s: %v", name, err)
-		}
 	},
 }
 

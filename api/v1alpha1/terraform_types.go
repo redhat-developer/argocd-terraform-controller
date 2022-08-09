@@ -25,8 +25,7 @@ import (
 
 // TerraformSpec defines the desired state of Terraform
 type TerraformSpec struct {
-	Revision  string `json:"revision"`
-	Completed bool   `json:"completed"`
+	Revision string `json:"revision"`
 }
 
 // TerraformStatus defines the observed state of Terraform

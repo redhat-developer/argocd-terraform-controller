@@ -35,12 +35,9 @@ spec:
           spec:
             description: TerraformSpec defines the desired state of Terraform
             properties:
-              completed:
-                type: boolean
               revision:
                 type: string
             required:
-            - completed
             - revision
             type: object
           status:

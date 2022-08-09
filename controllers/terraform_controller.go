@@ -20,16 +20,24 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	argoprojiov1alpha1 "github.com/sabre1041/argocd-terraform-controller/api/v1alpha1"
 )
@@ -72,8 +80,6 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		l.Error(err, "Error getting Terraform resource to reconcile")
 		return ctrl.Result{}, err
 	}
-
-	l.Info(fmt.Sprintf("%+v", terraform))
 
 	image := "quay.io/jsawaya/terraform-controller-worker:latest"
 	workerImageEnvVar, workerImageEnvVarExists := os.LookupEnv("WORKER_IMG")
@@ -243,6 +249,9 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "worker-pod-" + req.Name,
 			Namespace: req.Namespace,
+			Labels: map[string]string{
+				"argoproj.io/worker": "true",
+			},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -287,7 +296,14 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		},
 	}
 
-	if terraform.Spec.Completed == true {
+	existingPod := &corev1.Pod{}
+
+	err = r.Get(ctx, client.ObjectKeyFromObject(pod), existingPod)
+	if client.IgnoreNotFound(err) != nil {
+		return ctrl.Result{}, err
+	}
+
+	if existingPod.ObjectMeta.Name != "" {
 		err = r.Delete(ctx, pod)
 		if err != nil {
 			l.Error(err, "Error deleting pod")
@@ -310,5 +326,41 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func (r *TerraformReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&argoprojiov1alpha1.Terraform{}).
+		Watches(
+			&source.Kind{Type: &corev1.Pod{}},
+			handler.EnqueueRequestsFromMapFunc(r.filterFinishedWorkerPods),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
+}
+
+func (r *TerraformReconciler) filterFinishedWorkerPods(pod client.Object) []reconcile.Request {
+
+	pl := &corev1.PodList{}
+	requirement, err := labels.NewRequirement("argoproj.io/worker", selection.Exists, []string{})
+	if err != nil {
+		return []reconcile.Request{}
+	}
+
+	ls := labels.NewSelector().Add(*requirement)
+	listOps := &client.ListOptions{
+		LabelSelector: ls,
+		Namespace:     pod.GetNamespace(),
+	}
+	err = r.List(context.TODO(), pl, listOps)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+	requests := make([]reconcile.Request, 0)
+	for _, item := range pl.Items {
+		if item.Status.Phase == corev1.PodSucceeded && item.DeletionTimestamp.IsZero() {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      strings.TrimPrefix(item.GetName(), "worker-pod-"),
+					Namespace: item.GetNamespace(),
+				},
+			})
+		}
+	}
+	return requests
 }
