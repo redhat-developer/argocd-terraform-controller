@@ -55,10 +55,10 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Build worker container
-        run: make podman-build-no-test
+        run: make podman-build-worker-no-test
 
       - name: Export container image
-        run: podman save -o /tmp/worker.tar quay.io/ablock/terraform-controller-worker:latest
+        run: podman save -o /tmp/worker.tar ${WORKER_IMAGE}
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1

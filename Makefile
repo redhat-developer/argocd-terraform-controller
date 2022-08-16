@@ -174,7 +174,7 @@ podman-build-no-test: manifests generate fmt ## Build docker image with the mana
 
 .PHONY: podman-build-worker-no-test
 podman-build-worker-no-test: manifests generate fmt ## Build docker image with the manager.
-	podman build -f worker.Dockerfile -t ${WORKER_IMG} .
+	podman build -f worker.Dockerfile -t ${WORKER_IMG}
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
