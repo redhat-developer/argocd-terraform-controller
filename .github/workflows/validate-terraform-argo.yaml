@@ -9,6 +9,7 @@ on:
 env:
   GO_VERSION: "1.17"
   CONTROLLER_IMAGE: "quay.io/ablock/argocd-terraform-controller:latest"
+  WORKER_IMAGE: "quay.io/ablock/terraform-controller-worker:latest"
 
 
 jobs:
@@ -40,9 +41,34 @@ jobs:
           name: controller
           path: /tmp/controller.tar
 
+  build-worker:
+    name: Build-worker
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build worker container
+        run: make podman-build-no-test
+
+      - name: Export container image
+        run: podman save -o /tmp/worker.tar quay.io/ablock/terraform-controller-worker:latest
+
+      - name: Save container as artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: worker
+          path: /tmp/worker.tar
+
   deploy:
     name: Deploy Kind cluster and run tests
-    needs: [ build-controller ]
+    needs: [ build-controller, build-worker ]
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
@@ -75,6 +101,18 @@ jobs:
     - name: Load the controller image into Kind
       run: kind load docker-image ${CONTROLLER_IMAGE}
 
+    - name: Pull the container image from Artifacts
+      uses: actions/download-artifact@v1
+      with:
+        name: worker
+        path: /tmp
+
+    - name: Load the worker image
+      run: docker load -i /tmp/worker.tar
+
+    - name: Load the worker image into Kind
+      run: kind load docker-image ${WORKER_IMAGE}
+
     - name: Install the controller
       run: |
         kubectl create namespace argocd
@@ -88,7 +126,7 @@ jobs:
 
   push-controller:
     name: Push controller image to registry
-    needs: [build-controller, deploy]
+    needs: [build-controller, build-worker, deploy]
     runs-on: ubuntu-20.04
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
@@ -119,3 +157,12 @@ jobs:
           platforms: "linux/amd64,linux/arm64"
           push: true
           tags: ${{ env.CONTROLLER_IMAGE }}
+
+      - name: "Build Worker Image"
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: "./worker.Dockerfile"
+          platforms: "linux/amd64,linux/arm64"
+          push: true
+          tags: ${{ env.WORKER_IMAGE }}

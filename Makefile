@@ -50,6 +50,7 @@ endif
 
 # Image URL to use all building/pushing image targets
 IMG ?= quay.io/ablock/argocd-terraform-controller
+WORKER_IMG ?= quay.io/ablock/terraform-controller-worker
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.23
 
@@ -173,7 +174,7 @@ podman-build-no-test: manifests generate fmt ## Build docker image with the mana
 
 .PHONY: podman-build-worker-no-test
 podman-build-worker-no-test: manifests generate fmt ## Build docker image with the manager.
-	podman build -f worker.Dockerfile -t ${IMG} .
+	podman build -f worker.Dockerfile -t ${WORKER_IMG} .
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
