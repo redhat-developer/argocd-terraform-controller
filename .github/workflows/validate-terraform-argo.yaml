@@ -116,13 +116,14 @@ jobs:
     - name: Install the controller
       run: |
         kubectl create namespace argocd
-        kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-        make deploy
-        kubectl get events -n argocd
-        kubectl get po -A
+        kubectl apply -k terraform-generate/kustomize-core-install -n argocd
+        kubectl apply -f controller.yaml
+        kubectl wait deployment -n argocd argocd-repo-server --for condition=Available=True --timeout=500s
 
     - name: run e2e tests
-      run: make test-e2e
+      run: |
+        mkdir bin
+        make test-e2e
 
   push-controller:
     name: Push controller image to registry
