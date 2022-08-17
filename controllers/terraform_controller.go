@@ -81,7 +81,7 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	image := "quay.io/jsawaya/terraform-controller-worker:latest"
+	image := "quay.io/ablock/terraform-controller-worker:latest"
 	workerImageEnvVar, workerImageEnvVarExists := os.LookupEnv("WORKER_IMG")
 	if workerImageEnvVarExists {
 		image = workerImageEnvVar

@@ -1,0 +1,45 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 200
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: terraform-test
+  namespace: argocd
+spec:
+  destination:
+    namespace: argocd
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: config/samples
+    plugin:
+      name: argocd-terraform-generator
+    repoURL: https://github.com/sabre1041/argocd-terraform-controller.git
+  syncPolicy:
+    automated: {}
+status:
+  health:
+    status: Healthy
+  resources:
+  - group: argoproj.io
+    kind: Terraform
+    name: terraform-test
+    namespace: argocd
+    status: Synced
+    version: v1alpha1
+  sourceType: Plugin
+  sync:
+    comparedTo:
+      destination:
+        namespace: argocd
+        server: https://kubernetes.default.svc
+      source:
+        path: config/samples
+        plugin:
+          name: argocd-terraform-generator
+        repoURL: https://github.com/sabre1041/argocd-terraform-controller.git
+    status: Synced
+

@@ -1,12 +1,22 @@
 #! /bin/bash
 set -e -o pipefail
 
-kubectl apply -n default -f - <<EOF
+kubectl apply -n argocd -f - <<EOF
 ---
 apiVersion: argoproj.io/v1alpha1
-kind: Terraform
+kind: Application
 metadata:
-  name: terraform-sample
+  name: terraform-test
 spec:
-  # TODO(user): Add fields here
+  destination:
+    namespace: argocd
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated: {}
+  project: default
+  source:
+    path: config/samples
+    plugin:
+      name: argocd-terraform-generator
+    repoURL: https://github.com/sabre1041/argocd-terraform-controller.git
 EOF
