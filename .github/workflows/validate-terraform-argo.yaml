@@ -26,6 +26,9 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: generate bin directory
+        run: mkdir bin
+
       - name: Test
         run: make test
 
@@ -53,6 +56,9 @@ jobs:
         uses: actions/setup-go@v1
         with:
           go-version: ${{ env.GO_VERSION }}
+
+      - name: generate bin directory
+        run: mkdir bin
 
       - name: Build worker container
         run: make podman-build-worker-no-test
