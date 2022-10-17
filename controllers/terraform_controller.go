@@ -258,6 +258,7 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				{
 					Name:    "terraform-controller-worker-" + req.Name,
 					Image:   image,
+					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command: []string{"/usr/local/bin/worker"},
 					Args:    []string{req.Namespace, req.Name},
 					VolumeMounts: []corev1.VolumeMount{
