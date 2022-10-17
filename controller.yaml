@@ -368,7 +368,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: quay.io/jsawaya/argocd-tf-controller:latest
+        image: quay.io/ablock/argocd-terraform-controller:latest
         livenessProbe:
           httpGet:
             path: /healthz

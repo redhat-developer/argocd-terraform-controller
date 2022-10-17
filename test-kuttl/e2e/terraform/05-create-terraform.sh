@@ -6,7 +6,7 @@ kubectl apply -n argocd -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: terraform-test
+  name: jo-terraform-test
 spec:
   destination:
     namespace: argocd
@@ -15,8 +15,8 @@ spec:
     automated: {}
   project: default
   source:
-    path: config/samples
+    path: manifests
     plugin:
       name: argocd-terraform-generator
-    repoURL: https://github.com/sabre1041/argocd-terraform-controller.git
+    repoURL: https://github.com/josephsawaya/terraform-test.git
 EOF
