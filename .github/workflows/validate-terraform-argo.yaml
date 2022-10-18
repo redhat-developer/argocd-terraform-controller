@@ -7,7 +7,7 @@ on:
     branches: ["main", "release*"]
 
 env:
-  GO_VERSION: "1.17"
+  GO_VERSION: "1.18"
   CONTROLLER_IMAGE: "quay.io/ablock/argocd-terraform-controller:latest"
   WORKER_IMAGE: "quay.io/ablock/terraform-controller-worker:latest"
 
@@ -54,6 +54,9 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: generate bin directory
+        run: mkdir bin
+
       - name: Build worker container
         run: make podman-build-worker-no-test
 
@@ -72,6 +75,11 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
+      
+    - name: Install Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: ${{ env.GO_VERSION }}
 
     - name: Install the Kubectl binary
       run: |
@@ -117,13 +125,11 @@ jobs:
       run: |
         kubectl create namespace argocd
         kubectl apply -k terraform-generate/kustomize-core-install -n argocd
-        kubectl apply -f controller.yaml
+        make deploy
         kubectl wait deployment -n argocd argocd-repo-server --for condition=Available=True --timeout=500s
 
     - name: run e2e tests
-      run: |
-        mkdir bin
-        make test-e2e
+      run: make test-e2e
 
   push-controller:
     name: Push controller image to registry

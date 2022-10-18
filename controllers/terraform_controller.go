@@ -256,10 +256,11 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:    "terraform-controller-worker-" + req.Name,
-					Image:   image,
-					Command: []string{"/usr/local/bin/worker"},
-					Args:    []string{req.Namespace, req.Name},
+					Name:            "terraform-controller-worker-" + req.Name,
+					Image:           image,
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Command:         []string{"/usr/local/bin/worker"},
+					Args:            []string{req.Namespace, req.Name},
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "files",

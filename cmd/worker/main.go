@@ -62,22 +62,27 @@ terraform {
 }`, name, namespace)
 
 		os.WriteFile("/opt/manifests/readable/backend.tf", []byte(backendConfig), 0644)
+		klog.Infof("backend.tf written")
 
+		klog.Info("Initializing Terraform")
 		err = tf.Init(ctx, tfexec.Upgrade(true))
 		if err != nil {
 			klog.Errorf("error running Init: %s", err)
 		}
 
+		klog.Info("Running Terraform Plan")
 		_, err = tf.Plan(ctx)
 		if err != nil {
 			klog.Errorf("error running Plan: %s", err)
 		}
 
+		klog.Info("Running Terraform Apply")
 		err = tf.Apply(ctx)
 		if err != nil {
 			klog.Errorf("error running Apply: %s", err)
 		}
 
+		klog.Info("Terrafom Apply Complete")
 	},
 }
 
