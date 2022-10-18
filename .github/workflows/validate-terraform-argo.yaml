@@ -129,9 +129,7 @@ jobs:
         kubectl wait deployment -n argocd argocd-repo-server --for condition=Available=True --timeout=500s
 
     - name: run e2e tests
-      run: |
-        mkdir bin
-        make test-e2e
+      run: make test-e2e
 
   push-controller:
     name: Push controller image to registry
