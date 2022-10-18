@@ -26,9 +26,6 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: generate bin directory
-        run: mkdir bin
-
       - name: Test
         run: make test
 
