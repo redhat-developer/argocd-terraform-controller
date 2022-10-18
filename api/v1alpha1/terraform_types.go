@@ -30,8 +30,7 @@ type TerraformSpec struct {
 
 // TerraformStatus defines the observed state of Terraform
 type TerraformStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	SyncStatus string `json:"syncStatus,omitempty"`
 }
 
 // Terraform is the Schema for the terraforms API

@@ -68,18 +68,24 @@ terraform {
 		err = tf.Init(ctx, tfexec.Upgrade(true))
 		if err != nil {
 			klog.Errorf("error running Init: %s", err)
+			// Force exit with error
+			os.Exit(1)
 		}
 
 		klog.Info("Running Terraform Plan")
 		_, err = tf.Plan(ctx)
 		if err != nil {
 			klog.Errorf("error running Plan: %s", err)
+			// Force exit with error
+			os.Exit(1)
 		}
 
 		klog.Info("Running Terraform Apply")
 		err = tf.Apply(ctx)
 		if err != nil {
 			klog.Errorf("error running Apply: %s", err)
+			// Force exit with error
+			os.Exit(1)
 		}
 
 		klog.Info("Terrafom Apply Complete")
