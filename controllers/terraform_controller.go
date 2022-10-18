@@ -305,7 +305,8 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if existingPod.ObjectMeta.Name != "" {
-		// Update SyncStatus with the pod reason of exit
+		// Update SyncStatus with the pod reason of exit.
+		l.Info("Pod status is " + existingPod.Status.Reason)
 		terraform.Status.SyncStatus = existingPod.Status.Reason
 		if err := r.Status().Update(ctx, terraform); err != nil {
 			l.Error(err, "Failed to update status")
