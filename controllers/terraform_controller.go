@@ -42,6 +42,9 @@ import (
 	argoprojiov1alpha1 "github.com/sabre1041/argocd-terraform-controller/api/v1alpha1"
 )
 
+// Set Default Controller Image
+var WorkerImage string = "quay.io/ablock/terraform-controller-worker:latest"
+
 // TerraformReconciler reconciles a Terraform object
 type TerraformReconciler struct {
 	client.Client
@@ -81,10 +84,9 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	image := "quay.io/ablock/terraform-controller-worker:latest"
 	workerImageEnvVar, workerImageEnvVarExists := os.LookupEnv("WORKER_IMG")
 	if workerImageEnvVarExists {
-		image = workerImageEnvVar
+		WorkerImage = workerImageEnvVar
 	}
 
 	role := &rbacv1.Role{
@@ -257,7 +259,7 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			Containers: []corev1.Container{
 				{
 					Name:            "terraform-controller-worker-" + req.Name,
-					Image:           image,
+					Image:           WorkerImage,
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command:         []string{"/usr/local/bin/worker"},
 					Args:            []string{req.Namespace, req.Name},
