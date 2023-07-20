@@ -282,7 +282,7 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				},
 			},
 			ServiceAccountName: "argocd-terraform-worker",
-			RestartPolicy:      corev1.RestartPolicyOnFailure,
+			RestartPolicy:      corev1.RestartPolicyNever,
 			Volumes: []corev1.Volume{
 				{
 					Name: "files",
@@ -307,6 +307,13 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if existingPod.ObjectMeta.Name != "" {
+		// Update SyncStatus with the pod reason of exit.
+		terraform.Status.SyncStatus = podStatusReason(pod)
+		if err := r.Status().Update(ctx, terraform); err != nil {
+			l.Error(err, "Failed to update status")
+			return ctrl.Result{}, err
+		}
+
 		err = r.Delete(ctx, pod)
 		if err != nil {
 			l.Error(err, "Error deleting pod")
@@ -323,6 +330,10 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func podStatusReason(pod *corev1.Pod) string {
+	return string(pod.Status.Phase)
 }
 
 // SetupWithManager sets up the controller with the Manager.
