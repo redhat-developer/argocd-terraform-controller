@@ -1,0 +1,343 @@
+// Copyright 2026 The Argo CD Terraform Controller Authors.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package runner;
+
+option go_package = "github.com/redhat-developer/argocd-terraform-controller/internal/runner;runner";
+
+// Runner executes terraform / tofu on behalf of the controller. Every RPC
+// that operates on a Terraform session takes the tfInstance id returned by
+// NewTerraform.
+service Runner {
+  // Binary and session setup
+  rpc LookPath(LookPathRequest) returns (LookPathReply) {}
+  rpc NewTerraform(NewTerraformRequest) returns (NewTerraformReply) {}
+  rpc SetEnv(SetEnvRequest) returns (SetEnvReply) {}
+  rpc CreateFileMappings(CreateFileMappingsRequest) returns (CreateFileMappingsReply) {}
+
+  // Source
+  rpc UploadAndExtract(UploadAndExtractRequest) returns (UploadAndExtractReply) {}
+  rpc CleanupDir(CleanupDirRequest) returns (CleanupDirReply) {}
+
+  // Configuration generation
+  rpc WriteBackendConfig(WriteBackendConfigRequest) returns (WriteBackendConfigReply) {}
+  rpc ProcessCliConfig(ProcessCliConfigRequest) returns (ProcessCliConfigReply) {}
+  rpc GenerateVarsForTF(GenerateVarsForTFRequest) returns (GenerateVarsForTFReply) {}
+  rpc GenerateTemplate(GenerateTemplateRequest) returns (GenerateTemplateReply) {}
+
+  // Lifecycle
+  rpc Init(InitRequest) returns (InitReply) {}
+  rpc SelectWorkspace(WorkspaceRequest) returns (WorkspaceReply) {}
+  rpc Plan(PlanRequest) returns (PlanReply) {}
+  rpc ShowPlanFileRaw(ShowPlanFileRawRequest) returns (ShowPlanFileRawReply) {}
+  rpc ShowPlanFile(ShowPlanFileRequest) returns (ShowPlanFileReply) {}
+  rpc SaveTFPlan(SaveTFPlanRequest) returns (SaveTFPlanReply) {}
+  rpc LoadTFPlan(LoadTFPlanRequest) returns (LoadTFPlanReply) {}
+  rpc Apply(ApplyRequest) returns (ApplyReply) {}
+  rpc Destroy(DestroyRequest) returns (DestroyReply) {}
+  rpc GetInventory(GetInventoryRequest) returns (GetInventoryReply) {}
+
+  // Outputs
+  rpc Output(OutputRequest) returns (OutputReply) {}
+  rpc WriteOutputs(WriteOutputsRequest) returns (WriteOutputsReply) {}
+  rpc GetOutputs(GetOutputsRequest) returns (GetOutputsReply) {}
+
+  // State & cleanup
+  rpc ForceUnlock(ForceUnlockRequest) returns (ForceUnlockReply) {}
+  rpc FinalizeSecrets(FinalizeSecretsRequest) returns (FinalizeSecretsReply) {}
+  rpc DeleteState(DeleteStateRequest) returns (DeleteStateReply) {}
+}
+
+message LookPathRequest {
+  // Candidate binary names in order of preference, e.g. ["tofu", "terraform"].
+  repeated string files = 1;
+}
+
+message LookPathReply {
+  string execPath = 1;
+}
+
+message NewTerraformRequest {
+  string workingDir = 1;
+  string execPath = 2;
+  // Serialised Terraform object (see Terraform.ToBytes).
+  bytes terraform = 3;
+  string instanceID = 4;
+}
+
+message NewTerraformReply {
+  string id = 1;
+  // Version string reported by the binary, e.g. "OpenTofu 1.9.0".
+  string version = 2;
+}
+
+message SetEnvRequest {
+  string tfInstance = 1;
+  map<string, string> envs = 2;
+}
+
+message SetEnvReply {
+  string message = 1;
+}
+
+message FileMapping {
+  bytes content = 1;
+  string location = 2;
+  string path = 3;
+}
+
+message CreateFileMappingsRequest {
+  string workingDir = 1;
+  repeated FileMapping fileMappings = 2;
+}
+
+message CreateFileMappingsReply {
+  string message = 1;
+}
+
+message UploadAndExtractRequest {
+  string namespace = 1;
+  string name = 2;
+  bytes tarGz = 3;
+  string path = 4;
+}
+
+message UploadAndExtractReply {
+  string workingDir = 1;
+  string tmpDir = 2;
+}
+
+message CleanupDirRequest {
+  string tmpDir = 1;
+}
+
+message CleanupDirReply {
+  string message = 1;
+}
+
+message WriteBackendConfigRequest {
+  string dirPath = 1;
+  bytes backendConfig = 2;
+}
+
+message WriteBackendConfigReply {
+  string message = 1;
+}
+
+message ProcessCliConfigRequest {
+  string dirPath = 1;
+  string namespace = 2;
+  string name = 3;
+}
+
+message ProcessCliConfigReply {
+  string filePath = 1;
+}
+
+message GenerateVarsForTFRequest {
+  string workingDir = 1;
+}
+
+message GenerateVarsForTFReply {
+  string message = 1;
+}
+
+message GenerateTemplateRequest {
+  string workingDir = 1;
+}
+
+message GenerateTemplateReply {
+  string message = 1;
+}
+
+message InitRequest {
+  string tfInstance = 1;
+  bool upgrade = 2;
+  bool forceCopy = 3;
+}
+
+message InitReply {
+  string message = 1;
+  string stateLockIdentifier = 2;
+}
+
+message WorkspaceRequest {
+  string tfInstance = 1;
+}
+
+message WorkspaceReply {
+  string message = 1;
+}
+
+message PlanRequest {
+  string tfInstance = 1;
+  string out = 2;
+  bool refresh = 3;
+  bool destroy = 4;
+  repeated string targets = 5;
+  string lockTimeout = 6;
+  string sourceRefRootDir = 7;
+}
+
+message PlanReply {
+  bool drifted = 1;
+  string message = 2;
+  string stateLockIdentifier = 3;
+  bool planCreated = 4;
+}
+
+message ShowPlanFileRequest {
+  string tfInstance = 1;
+  string filename = 2;
+}
+
+message ShowPlanFileReply {
+  bytes jsonOutput = 1;
+}
+
+message ShowPlanFileRawRequest {
+  string tfInstance = 1;
+  string filename = 2;
+}
+
+message ShowPlanFileRawReply {
+  string rawOutput = 1;
+}
+
+message SaveTFPlanRequest {
+  string tfInstance = 1;
+  bool backendCompletelyDisable = 2;
+  string name = 3;
+  string namespace = 4;
+  string uuid = 5;
+  string revision = 6;
+}
+
+message SaveTFPlanReply {
+  string message = 1;
+  // Name of the ConfigMap or Secret holding the readable plan, if stored.
+  string readablePlanName = 2;
+}
+
+message LoadTFPlanRequest {
+  string tfInstance = 1;
+  bool backendCompletelyDisable = 2;
+  string name = 3;
+  string namespace = 4;
+  string pendingPlan = 5;
+}
+
+message LoadTFPlanReply {
+  string message = 1;
+}
+
+message ApplyRequest {
+  string tfInstance = 1;
+  string dirOrPlan = 2;
+  bool refreshBeforeApply = 3;
+  repeated string targets = 4;
+  int32 parallelism = 5;
+}
+
+message ApplyReply {
+  string message = 1;
+  string stateLockIdentifier = 2;
+}
+
+message DestroyRequest {
+  string tfInstance = 1;
+  repeated string targets = 2;
+}
+
+message DestroyReply {
+  string message = 1;
+  string stateLockIdentifier = 2;
+}
+
+message GetInventoryRequest {
+  string tfInstance = 1;
+}
+
+message GetInventoryReply {
+  repeated Inventory inventories = 1;
+}
+
+message Inventory {
+  string name = 1;
+  string type = 2;
+  string identifier = 3;
+}
+
+message OutputRequest {
+  string tfInstance = 1;
+}
+
+message OutputReply {
+  map<string, OutputMeta> outputs = 1;
+}
+
+message OutputMeta {
+  bool sensitive = 1;
+  bytes type = 2;
+  bytes value = 3;
+}
+
+message WriteOutputsRequest {
+  string namespace = 1;
+  string name = 2;
+  string secretName = 3;
+  string uuid = 4;
+  map<string, bytes> data = 5;
+  map<string, string> labels = 6;
+  map<string, string> annotations = 7;
+}
+
+message WriteOutputsReply {
+  string message = 1;
+  bool changed = 2;
+}
+
+message GetOutputsRequest {
+  string namespace = 1;
+  string secretName = 2;
+}
+
+message GetOutputsReply {
+  map<string, string> outputs = 1;
+}
+
+message ForceUnlockRequest {
+  string tfInstance = 1;
+  string lockIdentifier = 2;
+}
+
+message ForceUnlockReply {
+  string message = 1;
+  bool success = 2;
+}
+
+message FinalizeSecretsRequest {
+  string namespace = 1;
+  string name = 2;
+  string workspace = 3;
+  bool hasSpecifiedOutputSecret = 4;
+  string outputSecretName = 5;
+}
+
+message FinalizeSecretsReply {
+  string message = 1;
+  bool notFound = 2;
+}
+
+message DeleteStateRequest {
+  string namespace = 1;
+  string secretName = 2;
+  string leaseName = 3;
+}
+
+message DeleteStateReply {
+  string message = 1;
+  bool notFound = 2;
+}

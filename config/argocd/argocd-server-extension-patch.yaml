@@ -1,0 +1,34 @@
+# Installs the Terraform UI extension into argocd-server using the
+# argocd-extension-installer init container. Pin EXTENSION_URL and
+# EXTENSION_CHECKSUM_URL to a release of this project.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-server
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: extension-terraform
+          image: quay.io/argoprojlabs/argocd-extension-installer:v0.0.9@sha256:d2b43c18ac1401f579f6d27878f45e253d1e3f30287471ae74e6a4315ceb0611
+          env:
+            - name: EXTENSION_NAME
+              value: terraform
+            - name: EXTENSION_URL
+              value: https://github.com/redhat-developer/argocd-terraform-controller/releases/latest/download/argocd-terraform-extension.tar.gz
+            - name: EXTENSION_CHECKSUM_URL
+              value: https://github.com/redhat-developer/argocd-terraform-controller/releases/latest/download/checksums.txt
+          volumeMounts:
+            - name: extensions
+              mountPath: /tmp/extensions/
+          securityContext:
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+      containers:
+        - name: argocd-server
+          volumeMounts:
+            - name: extensions
+              mountPath: /tmp/extensions/
+      volumes:
+        - name: extensions
+          emptyDir: {}

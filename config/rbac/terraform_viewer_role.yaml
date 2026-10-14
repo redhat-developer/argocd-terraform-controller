@@ -1,11 +1,20 @@
-# permissions for end users to view terraforms.
+# This rule is not used by the project argocd-terraform-controller itself.
+# It is provided to allow the cluster admin to help manage permissions for users.
+#
+# Grants read-only access to infra.argocd.io resources.
+# This role is intended for users who need visibility into these resources
+# without permissions to modify them. It is ideal for monitoring purposes and limited-access viewing.
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  labels:
+    app.kubernetes.io/name: argocd-terraform-controller
+    app.kubernetes.io/managed-by: kustomize
   name: terraform-viewer-role
 rules:
 - apiGroups:
-  - argoproj.io
+  - infra.argocd.io
   resources:
   - terraforms
   verbs:
@@ -13,7 +22,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - argoproj.io
+  - infra.argocd.io
   resources:
   - terraforms/status
   verbs:

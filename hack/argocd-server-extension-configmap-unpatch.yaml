@@ -1,0 +1,11 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-server
+          volumeMounts:
+            - $patch: delete
+              mountPath: /tmp/extensions/terraform
+      volumes:
+        - $patch: delete
+          name: argocd-terraform-extension

@@ -1,0 +1,16 @@
+# Development only: mounts the locally built UI extension from the
+# argocd-terraform-extension ConfigMap (see `make deploy-extension-dev`).
+# Releases use the argocd-extension-installer init container instead
+# (config/argocd/argocd-server-extension-patch.yaml).
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-server
+          volumeMounts:
+            - name: argocd-terraform-extension
+              mountPath: /tmp/extensions/terraform
+      volumes:
+        - name: argocd-terraform-extension
+          configMap:
+            name: argocd-terraform-extension

@@ -1,0 +1,10 @@
+{{ .Chart.Name }} {{ .Chart.Version }} installed in namespace {{ .Release.Namespace }}.
+
+Runner ServiceAccounts (tf-runner) were created in: {{ include "atc.runnerNamespaces" . }}
+Add namespaces that host Terraform objects to runner.namespaces.
+
+Argo CD integration (health, actions, UI extension) is configuration only:
+  https://github.com/redhat-developer/argocd-terraform-controller/tree/main/config/argocd
+
+Create your first Terraform object:
+  kubectl apply -f https://raw.githubusercontent.com/redhat-developer/argocd-terraform-controller/main/config/samples/infra_v1alpha1_terraform.yaml

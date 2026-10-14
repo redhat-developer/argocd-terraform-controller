@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    name: Publish release assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Build the UI extension
+        run: make build-extension
+
+      - name: Build the install manifest
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          make build-installer IMG=quay.io/redhatworkshops/argocd-terraform-controller-manager:${TAG#v}
+          # Pin the runner image and the UI extension to this release.
+          sed -i "s#quay.io/redhatworkshops/argocd-terraform-controller-runner:latest#quay.io/redhatworkshops/argocd-terraform-controller-runner:${TAG#v}#" dist/install.yaml
+          sed "s#/releases/latest/download/#/releases/download/${TAG}/#" config/argocd/argocd-server-extension-patch.yaml > dist/argocd-server-extension-patch.yaml
+          cp config/argocd/argocd-cm-patch.yaml dist/
+          cd dist && sha256sum argocd-terraform-extension.tar.gz install.yaml argocd-cm-patch.yaml argocd-server-extension-patch.yaml > checksums.txt
+
+      - name: Package the Helm chart
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          make helm-sync-crds
+          helm package charts/argocd-terraform-controller --version "${TAG#v}" --app-version "${TAG#v}" --destination dist
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/argocd-terraform-extension.tar.gz
+            dist/install.yaml
+            dist/argocd-cm-patch.yaml
+            dist/argocd-server-extension-patch.yaml
+            dist/checksums.txt
+            dist/argocd-terraform-controller-*.tgz

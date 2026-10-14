@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "atc.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "atc.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.controller.replicas }}
+  selector:
+    matchLabels:
+      {{- include "atc.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "atc.selectorLabels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+        {{- with .Values.controller.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "atc.serviceAccountName" . }}
+      terminationGracePeriodSeconds: 10
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: manager
+        image: {{ include "atc.image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: [/manager]
+        args:
+        - --health-probe-bind-address=:8081
+        - --leader-elect={{ .Values.controller.leaderElection }}
+        - --concurrent={{ .Values.controller.concurrent }}
+        - --runner-image={{ include "atc.runnerImage" . }}
+        - --runner-grpc-port={{ .Values.runner.grpcPort }}
+        - --runner-grpc-max-message-size={{ .Values.runner.grpcMaxMessageSize }}
+        - --runner-creation-timeout={{ .Values.runner.creationTimeout }}
+        - --runner-rpc-timeout={{ .Values.runner.rpcTimeout }}
+        - --cluster-domain={{ .Values.controller.clusterDomain }}
+        - --no-cross-namespace-refs={{ .Values.controller.noCrossNamespaceRefs }}
+        {{- if .Values.argocd.repoCredentials.enabled }}
+        - --argocd-namespace={{ .Values.argocd.namespace }}
+        {{- end }}
+        - --ca-validity-duration={{ .Values.mtls.caValidityDuration }}
+        - --cert-rotation-check-frequency={{ .Values.mtls.rotationCheckFrequency }}
+        - --cert-lookahead-interval={{ .Values.mtls.lookaheadInterval }}
+        {{- if .Values.metrics.enabled }}
+        - --metrics-bind-address=:{{ .Values.metrics.port }}
+        - --metrics-secure={{ .Values.metrics.secure }}
+        {{- else }}
+        - --metrics-bind-address=0
+        {{- end }}
+        - --zap-log-level={{ .Values.controller.logLevel }}
+        {{- range .Values.controller.extraArgs }}
+        - {{ . }}
+        {{- end }}
+        env:
+        - name: RUNTIME_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        {{- with .Values.controller.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - name: health
+          containerPort: 8081
+        {{- if .Values.metrics.enabled }}
+        - name: metrics
+          containerPort: {{ .Values.metrics.port }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+        resources:
+          {{- toYaml .Values.controller.resources | nindent 10 }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      {{- with .Values.controller.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controller.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controller.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

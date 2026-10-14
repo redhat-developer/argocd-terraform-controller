@@ -1,0 +1,117 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "atc.fullname" . }}-manager
+  labels:
+    {{- include "atc.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: [configmaps, pods, secrets]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [""]
+  resources: [events]
+  verbs: [create, patch]
+- apiGroups: [coordination.k8s.io]
+  resources: [leases]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [infra.argocd.io]
+  resources: [terraforms]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [infra.argocd.io]
+  resources: [terraforms/finalizers]
+  verbs: [update]
+- apiGroups: [infra.argocd.io]
+  resources: [terraforms/status]
+  verbs: [get, patch, update]
+{{- if .Values.metrics.secure }}
+- apiGroups: [authentication.k8s.io]
+  resources: [tokenreviews]
+  verbs: [create]
+- apiGroups: [authorization.k8s.io]
+  resources: [subjectaccessreviews]
+  verbs: [create]
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "atc.fullname" . }}-manager
+  labels:
+    {{- include "atc.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "atc.fullname" . }}-manager
+subjects:
+- kind: ServiceAccount
+  name: {{ include "atc.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- if .Values.controller.leaderElection }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "atc.fullname" . }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "atc.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: [configmaps]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [coordination.k8s.io]
+  resources: [leases]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [""]
+  resources: [events]
+  verbs: [create, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "atc.fullname" . }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "atc.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "atc.fullname" . }}-leader-election
+subjects:
+- kind: ServiceAccount
+  name: {{ include "atc.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}
+---
+# Aggregated roles so cluster admins can grant Terraform access with the
+# standard admin/edit/view ClusterRoles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "atc.fullname" . }}-terraform-editor
+  labels:
+    {{- include "atc.labels" . | nindent 4 }}
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+- apiGroups: [infra.argocd.io]
+  resources: [terraforms]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [infra.argocd.io]
+  resources: [terraforms/status]
+  verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "atc.fullname" . }}-terraform-viewer
+  labels:
+    {{- include "atc.labels" . | nindent 4 }}
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+- apiGroups: [infra.argocd.io]
+  resources: [terraforms]
+  verbs: [get, list, watch]
+- apiGroups: [infra.argocd.io]
+  resources: [terraforms/status]
+  verbs: [get]
