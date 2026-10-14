@@ -1,0 +1,11 @@
+# Per-namespace runner identity. Apply this (with the target namespace) to
+# every namespace that hosts Terraform objects:
+#
+#   kustomize build config/runner | kubectl apply -n <namespace> -f -
+#
+# or reference it as a component from your own kustomization.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- service_account.yaml
+- role_binding.yaml

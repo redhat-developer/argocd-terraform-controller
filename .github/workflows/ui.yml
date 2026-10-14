@@ -1,0 +1,31 @@
+name: UI extension
+
+on:
+  push:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  ui:
+    permissions:
+      contents: read
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # Node runs in a container, exactly as in local development.
+      - name: Build, type-check, lint and test
+        run: make build-extension
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: argocd-terraform-extension
+          path: |
+            dist/argocd-terraform-extension.tar.gz
+            dist/checksums.txt

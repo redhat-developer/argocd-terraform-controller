@@ -1,0 +1,37 @@
+{
+  "name": "argocd-terraform-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Argo CD UI extension for the Argo CD Terraform Controller",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "webpack --config webpack.config.mjs",
+    "dev": "webpack --config webpack.config.mjs --watch --mode development",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "css-loader": "^7.1.2",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "jsdom": "^26.1.0",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.54.0",
+    "vitest": "^5.0.4",
+    "webpack": "^5.101.0",
+    "webpack-cli": "^6.0.1"
+  }
+}

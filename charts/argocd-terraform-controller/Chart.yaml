@@ -1,0 +1,17 @@
+apiVersion: v2
+name: argocd-terraform-controller
+description: Runs Terraform / OpenTofu from Argo CD with plan approval, drift detection and a UI extension
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/redhat-developer/argocd-terraform-controller
+sources:
+  - https://github.com/redhat-developer/argocd-terraform-controller
+keywords:
+  - argocd
+  - terraform
+  - opentofu
+  - gitops
+maintainers:
+  - name: Argo CD Terraform Controller Authors
+    url: https://github.com/redhat-developer/argocd-terraform-controller

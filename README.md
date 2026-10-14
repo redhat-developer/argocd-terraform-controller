@@ -1,55 +1,108 @@
-# argocd-terraform-controller
+# Argo CD Terraform Controller
 
-Argo CD Terraform Controller
-
-Start by creating an argocd cluster with the terraform-generate plugin
-installed.
-
-```
-kubectl create ns argocd
-kubectl apply -k terraform-generate/kustomize-core-install -n argocd
-kubectl config set-context --current --namespace=argocd
-```
-
-
-Create the ArgoCD Terraform controller from the yaml:
+Run Terraform and OpenTofu from Argo CD, GitOps style, with plan approval, drift
+detection and a UI extension. It is an **add-on**: no changes to Argo CD are
+required. The design follows the Flux [tofu-controller](https://github.com/flux-iac/tofu-controller).
 
 ```
-kubectl apply -f controller.yaml
+Argo CD Application ──sync──▶ Terraform (infra.argocd.io)  ◀── UI extension / health / actions
+                                   │
+                                   ▼ controller: fetch source, plan, approve, apply, drift
+                                   │ gRPC + mTLS
+                                   ▼
+                              runner Pod: tofu | terraform  ──▶ state Secret, plan, outputs
 ```
 
+## Features
 
-Now, create an ArgoCD app that uses the terraform-generate plugin, the repository should contain
-the terraform manifests you want to track:
+- **Terraform object** (`infra.argocd.io/v1alpha1`) describing a Git or OCI source,
+  variables, backend, approval mode, outputs and health checks. Argo CD syncs the
+  object; the controller does the rest.
+- **Terraform and OpenTofu** in one runner image; choose per object with
+  `spec.runner.binary: auto | terraform | tofu`.
+- **Plan / approve / apply** with manual approval by plan ID (from git, `kubectl`
+  or the Argo CD UI), `auto` approval, plan-only and drift-detection-only modes.
+- **Drift detection** on every interval, with automatic remediation in `auto` mode.
+- **State** in a Kubernetes Secret through Terraform's `kubernetes` backend by
+  default, or any other backend (`s3`, `gcs`, `azurerm`, …) and Terraform Cloud.
+- **Outputs to a Secret**, health checks, `dependsOn` between stacks, destroy on
+  deletion (optionally deleting the state too), state force-unlock.
+- **Argo CD integration** through supported extension points only: health
+  assessment and resource actions in `argocd-cm`, and a UI extension with a
+  *Terraform* tab (plan output, approve button) and an application view.
+- **Isolation**: the controller holds source credentials and talks to a
+  per-object runner Pod over mTLS; the runner only executes the binary with its
+  own ServiceAccount.
 
-```
-argocd app create terraform-test --repo <REPO URL> --path <REPO PATH> --dest-server https://kubernetes.default.svc --dest-namespace argocd --config-management-plugin argocd-terraform-generator
+## Quick start
+
+Install the controller (CRD, RBAC, Deployment):
+
+```sh
+kubectl apply -f https://github.com/redhat-developer/argocd-terraform-controller/releases/latest/download/install.yaml
 ```
 
+Create the runner identity in every namespace that will host Terraform objects:
 
-Sync the application to run the plugin and update the local terraform manifests
-
-```
-argocd app sync terraform-test
-```
-
-
-### Dev
-To generate controller.yaml:
-```
-# install controller-gen and kustomize
-make controller-gen
-make kustomize 
-mkdir bin
-cp ~/path/to/controller-gen bin/
-cp ~/path/to/kustomize bin/
-IMG=<image> make deploy-file
+```sh
+kustomize build https://github.com/redhat-developer/argocd-terraform-controller/config/runner | kubectl apply -n my-namespace -f -
 ```
 
-To build controller and worker images and push them:
+Integrate with Argo CD (health, actions, UI extension) — see
+[docs/argocd-integration.md](docs/argocd-integration.md):
+
+```sh
+kubectl patch configmap argocd-cm -n argocd --type merge --patch-file config/argocd/argocd-cm-patch.yaml
+kubectl patch deployment argocd-server -n argocd --patch-file config/argocd/argocd-server-extension-patch.yaml
 ```
-IMG=quay.io/jsawaya/argocd-tf-controller:latest make podman-build-no-test
-IMG=quay.io/jsawaya/argocd-tf-controller:latest make podman-push
-IMG=quay.io/jsawaya/terraform-controller-worker:latest make podman-build-worker-no-test
-IMG=quay.io/jsawaya/terraform-controller-worker:latest make podman-push
+
+Then put a Terraform object in a repository synced by an Argo CD Application:
+
+```yaml
+apiVersion: infra.argocd.io/v1alpha1
+kind: Terraform
+metadata:
+  name: network
+  namespace: my-namespace
+spec:
+  source:
+    git:
+      url: https://github.com/my-org/infra
+      ref:
+        branch: main
+  path: ./network
+  interval: 10m
+  approvePlan: ""          # manual: approve in the UI or set the plan ID here
+  runner:
+    binary: tofu
+  writeOutputsToSecret:
+    name: network-outputs
 ```
+
+The Application shows the object as *Suspended* while a plan waits for approval,
+*Progressing* while applying and *Healthy* once applied, so later sync waves can
+depend on the infrastructure.
+
+## Documentation
+
+- [Getting started](docs/getting-started.md)
+- [Argo CD integration](docs/argocd-integration.md) — health, actions, UI extension, RBAC, GitOps considerations
+- [Plan approval workflow](docs/approval-workflow.md)
+- [State backends, backup and restore](docs/state.md)
+- [Terraform vs OpenTofu](docs/binaries.md)
+- [Sources and credentials](docs/sources.md)
+- [API reference](docs/api.md)
+- [Development](docs/development.md)
+
+## Status
+
+Alpha. The API group `infra.argocd.io/v1alpha1` may change before v1.
+
+## License
+
+Apache-2.0. Copyright The Argo CD Terraform Controller Authors.
+
+Portions of this software are derived from the Flux IaC
+[tofu-controller](https://github.com/flux-iac/tofu-controller), originally
+created by Weaveworks Ltd. and the Flux IaC contributors, licensed under the
+Apache License, Version 2.0.

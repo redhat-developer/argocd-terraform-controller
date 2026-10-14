@@ -1,0 +1,29 @@
+apiVersion: infra.argocd.io/v1alpha1
+kind: Terraform
+metadata:
+  labels:
+    app.kubernetes.io/name: argocd-terraform-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: terraform-sample
+spec:
+  # Where the Terraform configuration lives. The controller fetches it; the
+  # Argo CD Application only needs to sync this object.
+  source:
+    git:
+      url: https://github.com/redhat-developer/argocd-terraform-controller
+      ref:
+        branch: main
+  path: ./examples/kube-namespace
+  interval: 10m
+  # "auto" applies every plan; leave empty to require a manual approval via
+  # `kubectl patch`, the Argo CD UI "Approve Plan" action, or git.
+  approvePlan: auto
+  # Which binary to run: auto (tofu if present, else terraform), terraform or tofu.
+  runner:
+    binary: auto
+  # State is stored in a Secret (tfstate-default-terraform-sample) by the
+  # Terraform kubernetes backend; see spec.backendConfig / spec.cloud for
+  # s3, gcs, azurerm or Terraform Cloud.
+  writeOutputsToSecret:
+    name: terraform-sample-outputs
+  destroyResourcesOnDeletion: true

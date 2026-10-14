@@ -1,0 +1,42 @@
+{{- if .Values.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "atc.fullname" . }}-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "atc.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "atc.selectorLabels" . | nindent 4 }}
+  ports:
+  - name: {{ if .Values.metrics.secure }}https{{ else }}http{{ end }}
+    port: {{ .Values.metrics.port }}
+    targetPort: metrics
+{{- if .Values.metrics.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "atc.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "atc.labels" . | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "atc.selectorLabels" . | nindent 6 }}
+  endpoints:
+  - port: {{ if .Values.metrics.secure }}https{{ else }}http{{ end }}
+    path: /metrics
+    {{- if .Values.metrics.secure }}
+    scheme: https
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      insecureSkipVerify: true
+    {{- end }}
+{{- end }}
+{{- end }}

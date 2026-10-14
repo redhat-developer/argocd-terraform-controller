@@ -2,36 +2,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: manager-role
 rules:
 - apiGroups:
   - ""
   resources:
   - configmaps
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - pods
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - secrets
   verbs:
   - create
@@ -44,41 +21,10 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccounts
+  - events
   verbs:
   - create
-  - delete
-  - get
-  - list
   - patch
-  - update
-  - watch
-- apiGroups:
-  - argoproj.io
-  resources:
-  - terraforms
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - argoproj.io
-  resources:
-  - terraforms/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - argoproj.io
-  resources:
-  - terraforms/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -92,9 +38,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - rbac.authorization.k8s.io
+  - infra.argocd.io
   resources:
-  - rolebindings
+  - terraforms
   verbs:
   - create
   - delete
@@ -104,14 +50,16 @@ rules:
   - update
   - watch
 - apiGroups:
-  - rbac.authorization.k8s.io
+  - infra.argocd.io
   resources:
-  - roles
+  - terraforms/finalizers
   verbs:
-  - create
-  - delete
+  - update
+- apiGroups:
+  - infra.argocd.io
+  resources:
+  - terraforms/status
+  verbs:
   - get
-  - list
   - patch
   - update
-  - watch

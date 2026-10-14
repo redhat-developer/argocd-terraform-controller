@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: argocd-terraform-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: tf-runner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-terraform-controller-runner-role
+subjects:
+- kind: ServiceAccount
+  name: tf-runner

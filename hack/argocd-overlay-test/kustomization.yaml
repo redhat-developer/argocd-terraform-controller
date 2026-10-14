@@ -1,0 +1,7 @@
+# Validates config/argocd against the upstream Argo CD manifests:
+#   kustomize build hack/argocd-overlay-test
+namespace: argocd
+resources:
+- https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+components:
+- ../../config/argocd

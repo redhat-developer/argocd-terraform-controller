@@ -1,0 +1,14 @@
+# Grants the controller read access to Argo CD repository credential Secrets
+# in the Argo CD namespace (spec.source.git.useArgoCDRepoCredentials).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argocd-terraform-controller-repo-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-terraform-controller-argocd-repo-reader
+subjects:
+- kind: ServiceAccount
+  name: argocd-terraform-controller-controller-manager
+  namespace: argocd-terraform-controller-system

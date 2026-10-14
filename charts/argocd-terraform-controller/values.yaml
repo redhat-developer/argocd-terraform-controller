@@ -1,0 +1,79 @@
+# Default values for argocd-terraform-controller.
+
+image:
+  repository: quay.io/redhatworkshops/argocd-terraform-controller-manager
+  # Defaults to the chart appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+runner:
+  image:
+    repository: quay.io/redhatworkshops/argocd-terraform-controller-runner
+    # Defaults to the chart appVersion.
+    tag: ""
+  # Namespaces that host Terraform objects. A tf-runner ServiceAccount and
+  # RoleBinding are created in each. The release namespace is always included.
+  namespaces: []
+  # Extra ClusterRole names to bind to every tf-runner ServiceAccount, e.g.
+  # for configurations that manage cluster resources with the kubernetes
+  # provider. Use with care.
+  extraClusterRoles: []
+  # gRPC port and maximum message size (MiB; bounds the source archive size).
+  grpcPort: 30000
+  grpcMaxMessageSize: 4
+  creationTimeout: 2m
+  rpcTimeout: 30m
+
+controller:
+  replicas: 1
+  # Number of Terraform objects reconciled concurrently.
+  concurrent: 4
+  leaderElection: true
+  # Deny dependsOn / cliConfigSecretRef references across namespaces.
+  noCrossNamespaceRefs: true
+  clusterDomain: cluster.local
+  logLevel: info
+  extraArgs: []
+  extraEnv: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+
+argocd:
+  # Namespace of the Argo CD installation.
+  namespace: argocd
+  # Allow Terraform objects to reuse Argo CD repository credentials
+  # (spec.source.git.useArgoCDRepoCredentials). Grants the controller read
+  # access to Secrets and ConfigMaps in argocd.namespace.
+  repoCredentials:
+    enabled: true
+
+mtls:
+  caValidityDuration: 168h
+  rotationCheckFrequency: 30m
+  lookaheadInterval: 1h
+
+metrics:
+  enabled: true
+  # Serve metrics over HTTPS protected by authn/authz (controller-runtime filters).
+  secure: true
+  port: 8443
+  serviceMonitor:
+    enabled: false
+    additionalLabels: {}
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault

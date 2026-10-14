@@ -1,0 +1,58 @@
+# Runner Pods write the state Secret, lock Lease, plan and outputs objects in
+# the namespace of their Terraform object.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "atc.fullname" . }}-runner
+  labels:
+    {{- include "atc.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: [secrets, configmaps]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [coordination.k8s.io]
+  resources: [leases]
+  verbs: [get, list, watch, create, update, patch, delete]
+{{- range $ns := include "atc.runnerNamespaces" . | fromJsonArray }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tf-runner
+  namespace: {{ $ns }}
+  labels:
+    {{- include "atc.labels" $ | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tf-runner
+  namespace: {{ $ns }}
+  labels:
+    {{- include "atc.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "atc.fullname" $ }}-runner
+subjects:
+- kind: ServiceAccount
+  name: tf-runner
+  namespace: {{ $ns }}
+{{- range $role := $.Values.runner.extraClusterRoles }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "atc.fullname" $ }}-runner-{{ $ns }}-{{ $role }}
+  labels:
+    {{- include "atc.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $role }}
+subjects:
+- kind: ServiceAccount
+  name: tf-runner
+  namespace: {{ $ns }}
+{{- end }}
+{{- end }}

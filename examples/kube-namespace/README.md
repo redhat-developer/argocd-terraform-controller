@@ -1,6 +1,13 @@
-This example creates a new namespace in the kubernetes cluster.
+# kube-namespace example
 
-The role.yaml should be applied before syncing the application.
+Creates a Namespace and a ConfigMap with the Kubernetes provider using the
+runner's ServiceAccount. The default `tf-runner` ServiceAccount can only
+manage Secrets, ConfigMaps and Leases in its own namespace, so grant it the
+extra permissions this example needs:
 
-The role.yaml gives the worker the necessary permissions to create
-a namespace in the cluster.
+```sh
+kubectl create clusterrolebinding tf-runner-namespaces \
+  --clusterrole=cluster-admin --serviceaccount=<namespace>:tf-runner
+```
+
+(Use a narrower ClusterRole in real deployments.)

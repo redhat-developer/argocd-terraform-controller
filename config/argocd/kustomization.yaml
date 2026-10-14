@@ -1,0 +1,32 @@
+# Argo CD integration, packaged as a Kustomize Component so it can be added
+# to an existing Argo CD kustomization:
+#
+#   # kustomization.yaml of your Argo CD install
+#   resources:
+#   - https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+#   components:
+#   - https://github.com/redhat-developer/argocd-terraform-controller/config/argocd?ref=main
+#
+# Without Kustomize, apply the pieces directly:
+#
+#   kubectl patch configmap argocd-cm -n argocd --type merge --patch-file config/argocd/argocd-cm-patch.yaml
+#   kubectl patch deployment argocd-server -n argocd --patch-file config/argocd/argocd-server-extension-patch.yaml
+#   kubectl apply -n argocd -f config/argocd/argocd_repo_reader_binding.yaml
+#
+# It contains no changes to Argo CD itself, only configuration:
+# - argocd-cm: health assessment and resource actions for Terraform objects
+# - argocd-server: init container that installs the UI extension
+# - RoleBinding letting the controller reuse Argo CD repository credentials
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+- argocd_repo_reader_binding.yaml
+patches:
+- path: argocd-cm-patch.yaml
+  target:
+    kind: ConfigMap
+    name: argocd-cm
+- path: argocd-server-extension-patch.yaml
+  target:
+    kind: Deployment
+    name: argocd-server
