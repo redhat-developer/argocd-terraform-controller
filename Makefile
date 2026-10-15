@@ -222,8 +222,13 @@ ui-shell: UI_TTY = -it
 
 .PHONY: build-extension
 build-extension: ui-build ui-test ## Package the UI extension release tarball and checksums into dist/.
-	mkdir -p dist
-	tar -czf dist/argocd-terraform-extension.tar.gz -C $(UI_DIR)/dist extension-terraform.js
+	rm -rf dist/extension && mkdir -p dist/extension/resources
+	# argocd-extension-installer copies resources/* into /tmp/extensions, so the
+	# bundle must live under a resources/ directory inside the tarball.
+	cp $(UI_DIR)/dist/extension-terraform.js dist/extension/resources/
+	tar -czf dist/argocd-terraform-extension.tar.gz -C dist/extension resources
+	tar -tzf dist/argocd-terraform-extension.tar.gz | grep -qx 'resources/extension-terraform.js'
+	rm -rf dist/extension
 	cd dist && sha256sum argocd-terraform-extension.tar.gz > checksums.txt
 	@echo "built dist/argocd-terraform-extension.tar.gz"
 

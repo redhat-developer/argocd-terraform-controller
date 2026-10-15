@@ -36,13 +36,16 @@ Argo CD Application ──sync──▶ Terraform (infra.argocd.io)  ◀── U
 
 ## Quick start
 
+The step-by-step, copy-and-paste version is in [docs/getting-started.md](docs/getting-started.md).
+
 Install the controller (CRD, RBAC, Deployment):
 
 ```sh
 kubectl apply -f https://github.com/redhat-developer/argocd-terraform-controller/releases/latest/download/install.yaml
 ```
 
-Create the runner identity in every namespace that will host Terraform objects:
+Create the runner identity (`tf-runner` ServiceAccount + RoleBinding) in every
+namespace that will host Terraform objects:
 
 ```sh
 kustomize build https://github.com/redhat-developer/argocd-terraform-controller/config/runner | kubectl apply -n my-namespace -f -
@@ -52,8 +55,9 @@ Integrate with Argo CD (health, actions, UI extension) — see
 [docs/argocd-integration.md](docs/argocd-integration.md):
 
 ```sh
-kubectl patch configmap argocd-cm -n argocd --type merge --patch-file config/argocd/argocd-cm-patch.yaml
-kubectl patch deployment argocd-server -n argocd --patch-file config/argocd/argocd-server-extension-patch.yaml
+RELEASE=https://github.com/redhat-developer/argocd-terraform-controller/releases/latest/download
+kubectl patch configmap argocd-cm -n argocd --type merge --patch "$(curl -fsSL ${RELEASE}/argocd-cm-patch.yaml)"
+kubectl patch deployment argocd-server -n argocd --patch "$(curl -fsSL ${RELEASE}/argocd-server-extension-patch.yaml)"
 ```
 
 Then put a Terraform object in a repository synced by an Argo CD Application:

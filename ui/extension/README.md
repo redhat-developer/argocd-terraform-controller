@@ -31,15 +31,17 @@ Or with Docker only: `docker build -f ui/extension/Dockerfile -o ui/extension/di
 
 ## Install
 
-Releases ship `argocd-terraform-extension.tar.gz` and `checksums.txt`, consumed by
-the [argocd-extension-installer](https://github.com/argoproj-labs/argocd-extension-installer)
+Releases ship `argocd-terraform-extension.tar.gz` (containing
+`resources/extension-terraform.js`, the layout the installer expects) and
+`checksums.txt`, consumed by the
+[argocd-extension-installer](https://github.com/argoproj-labs/argocd-extension-installer)
 init container in [`config/argocd/argocd-server-extension-patch.yaml`](../../config/argocd/argocd-server-extension-patch.yaml).
 
 For a quick local test copy the file into the server Pod:
 
 ```sh
 kubectl cp ui/extension/dist/extension-terraform.js \
-  argocd-server-xxx:/tmp/extensions/terraform/extension-terraform.js -n argocd
+  argocd-server-xxx:/tmp/extensions/resources/extension-terraform.js -n argocd
 kubectl rollout restart deployment/argocd-server -n argocd
 ```
 

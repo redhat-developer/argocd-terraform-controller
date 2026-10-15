@@ -1,103 +1,182 @@
 # Getting started
 
-## Prerequisites
+Everything below is copy-and-paste-able and only needs `kubectl` pointed at a
+cluster that already runs Argo CD in the `argocd` namespace. Set the two
+variables first.
 
-- Kubernetes 1.28+ and Argo CD 2.12+ (3.x recommended for the UI extension).
-- Cluster network access from the controller to your Git/OCI sources and from
-  runner Pods to the provider registries your configuration uses.
+```sh
+export VERSION=v0.0.2          # release of the Argo CD Terraform Controller
+export TF_NAMESPACE=team-a     # namespace that will host Terraform objects
+```
 
 ## 1. Install the controller
 
-With the release manifest:
-
 ```sh
-kubectl apply -f https://github.com/redhat-developer/argocd-terraform-controller/releases/latest/download/install.yaml
+kubectl apply -f https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/install.yaml
+kubectl -n argocd-terraform-controller-system rollout status deploy/argocd-terraform-controller-controller-manager
 ```
 
-With Helm:
+This creates the `Terraform` CRD, RBAC and the controller Deployment in
+`argocd-terraform-controller-system`. The Deployment carries two environment
+variables you may want to change later: `RUNNER_POD_IMAGE` (the runner image,
+which contains `terraform` and `tofu`) and `ARGOCD_NAMESPACE` (defaults to
+`argocd`, used to reuse Argo CD repository credentials).
+
+Alternatively, with Helm:
 
 ```sh
-helm install argocd-terraform-controller charts/argocd-terraform-controller \
+helm install argocd-terraform-controller \
+  https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/argocd-terraform-controller-${VERSION#v}.tgz \
   --namespace argocd-terraform-controller-system --create-namespace \
-  --set runner.namespaces='{team-a,team-b}'
+  --set runner.namespaces="{${TF_NAMESPACE}}"
 ```
 
-From source:
-
-```sh
-make deploy IMG=quay.io/redhatworkshops/argocd-terraform-controller-manager:latest
-```
-
-The controller reads two environment variables on its Deployment:
-
-| Variable | Purpose |
-|---|---|
-| `RUNNER_POD_IMAGE` | Default runner image (contains `terraform` and `tofu`). |
-| `ARGOCD_NAMESPACE` | Namespace of Argo CD, for `spec.source.git.useArgoCDRepoCredentials`. |
-
-## 2. Create the runner identity per namespace
+## 2. Create the runner identity in the Terraform namespace
 
 Runner Pods run as the `tf-runner` ServiceAccount of the Terraform object's
-namespace and need to write Secrets, ConfigMaps and Leases there (state, plans,
-outputs, locks):
+namespace and need to write Secrets, ConfigMaps and Leases there (state,
+plans, outputs, locks). Repeat for every namespace that hosts Terraform
+objects (the Helm chart does this for `runner.namespaces`):
 
 ```sh
-make deploy-runner-rbac NAMESPACE=team-a
-# or
-kustomize build config/runner | kubectl apply -n team-a -f -
+kubectl create namespace ${TF_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -n ${TF_NAMESPACE} -f - <<EOF
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tf-runner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tf-runner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-terraform-controller-runner-role
+subjects:
+- kind: ServiceAccount
+  name: tf-runner
+EOF
 ```
 
-If your configuration uses the `kubernetes` provider with the in-cluster
-ServiceAccount, grant `tf-runner` the additional permissions it needs (see
-[examples/kube-namespace](../examples/kube-namespace)). Cloud providers are
-usually authenticated with credentials passed through `spec.runner.podTemplate.spec.env`,
-`envFrom`, workload identity (IRSA, Workload Identity, …) or `spec.fileMappings`.
+The sample used below manages a Namespace and a ConfigMap with the Kubernetes
+provider, so for this walkthrough also let `tf-runner` do that (use a narrower
+ClusterRole in real deployments; cloud providers instead get credentials through
+`spec.runner.podTemplate.spec.env` / `envFrom`, workload identity or `spec.fileMappings`):
+
+```sh
+kubectl create clusterrolebinding tf-runner-${TF_NAMESPACE}-sample \
+  --clusterrole=cluster-admin --serviceaccount=${TF_NAMESPACE}:tf-runner
+```
 
 ## 3. Integrate with Argo CD
 
-See [argocd-integration.md](argocd-integration.md). At minimum apply the
-`argocd-cm` patch so Argo CD understands the health of Terraform objects:
+Three configuration-only changes to a stock Argo CD (details in
+[argocd-integration.md](argocd-integration.md)):
 
 ```sh
-make deploy-argocd ARGOCD_NAMESPACE=argocd
+# Health assessment and resource actions (approve-plan, replan, suspend, resume, force-unlock)
+kubectl patch configmap argocd-cm -n argocd --type merge \
+  --patch "$(curl -fsSL https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/argocd-cm-patch.yaml)"
+
+# UI extension, installed by an init container on argocd-server
+kubectl patch deployment argocd-server -n argocd \
+  --patch "$(curl -fsSL https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/argocd-server-extension-patch.yaml)"
+kubectl -n argocd rollout status deploy/argocd-server
+
+# Optional: let the controller reuse Argo CD repository credentials
+kubectl apply -n argocd -f https://raw.githubusercontent.com/redhat-developer/argocd-terraform-controller/${VERSION}/config/argocd/argocd_repo_reader_binding.yaml
 ```
 
-## 4. Create a Terraform object
+Verify the extension was installed:
 
-Commit a Terraform object to a repository that an Argo CD Application syncs:
+```sh
+kubectl -n argocd exec deploy/argocd-server -- ls /tmp/extensions/resources/
+# extension-terraform.js
+```
 
-```yaml
-apiVersion: infra.argocd.io/v1alpha1
-kind: Terraform
+Argo CD loads extensions at startup and browsers cache them; hard-refresh the
+UI (Ctrl/Cmd+Shift+R) after the rollout.
+
+## 4. Create an Application that syncs a Terraform object
+
+The UI extension renders inside Applications, so sync the Terraform object
+through Argo CD rather than applying it directly. This Application syncs the
+sample from this repository:
+
+```sh
+kubectl apply -n argocd -f - <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
 metadata:
-  name: hello
-  namespace: team-a
+  name: terraform-sample
 spec:
+  project: default
   source:
-    git:
-      url: https://github.com/redhat-developer/argocd-terraform-controller
-      ref:
-        branch: main
-  path: ./examples/kube-namespace
-  interval: 10m
-  approvePlan: auto
-  runner:
-    binary: tofu
-  writeOutputsToSecret:
-    name: hello-outputs
-  destroyResourcesOnDeletion: true
+    repoURL: https://github.com/redhat-developer/argocd-terraform-controller
+    targetRevision: ${VERSION}
+    path: config/samples
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ${TF_NAMESPACE}
+  syncPolicy:
+    automated: {}
+EOF
 ```
+
+The sample ([config/samples/infra_v1alpha1_terraform.yaml](../config/samples/infra_v1alpha1_terraform.yaml))
+fetches [examples/kube-namespace](../examples/kube-namespace) from Git, runs
+it with `approvePlan: auto`, writes the outputs to the Secret
+`terraform-sample-outputs` and destroys the resources when the object is deleted.
 
 Watch it progress:
 
 ```sh
-kubectl get terraform -n team-a -w
-kubectl get terraform hello -n team-a -o jsonpath='{.status.conditions}' | jq
-kubectl get secret tfstate-default-hello hello-outputs -n team-a
+kubectl get terraform -n ${TF_NAMESPACE} -w
 ```
 
-In the Argo CD UI, open the Application, click the Terraform resource and the
-**Terraform** tab, or switch to the **Terraform** application view.
+After a couple of minutes (provider download included):
+
+```sh
+kubectl get terraform terraform-sample -n ${TF_NAMESPACE} -o jsonpath='{.status.binary}{"\n"}{.status.lastAppliedRevision}{"\n"}'
+kubectl get secret -n ${TF_NAMESPACE} tfstate-default-terraform-sample terraform-sample-outputs
+kubectl get namespace terraform-demo
+kubectl get configmap tfplan-default-terraform-sample-readable -n ${TF_NAMESPACE} -o jsonpath='{.data.tfplan}'
+```
+
+In the Argo CD UI open the `terraform-sample` Application: the Terraform node
+has a **Terraform** tab (click the node, then the tab next to *Summary*), and
+the view switcher at the top of the page gains a **Terraform** view (cubes
+icon) listing every Terraform object of the Application.
+
+### Try manual approval
+
+```sh
+kubectl patch terraform terraform-sample -n ${TF_NAMESPACE} --type merge \
+  -p '{"spec":{"approvePlan":"","vars":[{"name":"namespace","value":"terraform-demo-2"}]}}'
+```
+
+The next plan has changes and waits: the object is **Suspended** in Argo CD
+with the plan ID in its message. Approve it with the **Approve plan** button
+in the Terraform tab, or:
+
+```sh
+PLAN=$(kubectl get terraform terraform-sample -n ${TF_NAMESPACE} -o jsonpath='{.status.plan.pending}')
+kubectl patch terraform terraform-sample -n ${TF_NAMESPACE} --type merge -p "{\"spec\":{\"approvePlan\":\"${PLAN}\"}}"
+```
+
+(The Application shows the patched object as OutOfSync; with
+`automated.selfHeal` Argo CD would revert it — see the GitOps considerations in
+[argocd-integration.md](argocd-integration.md).)
+
+## 5. Clean up
+
+```sh
+kubectl delete application terraform-sample -n argocd --cascade=foreground   # prunes the Terraform object, which destroys terraform-demo
+kubectl delete clusterrolebinding tf-runner-${TF_NAMESPACE}-sample
+kubectl delete -f https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/install.yaml
+```
 
 ## What happens on each reconciliation
 

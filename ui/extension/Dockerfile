@@ -7,5 +7,6 @@ RUN npm ci
 COPY . .
 RUN npm run type-check && npm run lint && npm test && npm run build
 
+# Layout expected by argocd-extension-installer (resources/*).
 FROM scratch AS dist
-COPY --from=build /work/dist/ /
+COPY --from=build /work/dist/extension-terraform.js /resources/extension-terraform.js
