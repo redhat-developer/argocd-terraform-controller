@@ -128,11 +128,11 @@ func (r *TerraformReconciler) reconcile(ctx context.Context, p *patcher, rc runn
 		}
 	}
 
-	if tf.Spec.EnableInventory && tf.Status.Inventory == nil {
+	if tf.Spec.GetEnableInventory() && tf.Status.Inventory == nil {
 		if entries, err := r.inventory(ctx, rc, s); err == nil && len(entries) > 0 {
 			tf.Status.Inventory = &infrav1.ResourceInventory{Entries: entries}
 		}
-	} else if !tf.Spec.EnableInventory {
+	} else if !tf.Spec.GetEnableInventory() {
 		tf.Status.Inventory = nil
 	}
 
@@ -380,12 +380,12 @@ func (r *TerraformReconciler) apply(ctx context.Context, p *patcher, tf *infrav1
 			return failed("Apply", infrav1.TFExecApplyFailedReason, err)
 		}
 		isDestroy = tf.Status.Plan.IsDestroyPlan
-		if tf.Spec.EnableInventory && !isDestroy {
+		if tf.Spec.GetEnableInventory() && !isDestroy {
 			var err error
 			if entries, err = r.inventory(ctx, rc, s); err != nil {
 				return failed("Inventory", infrav1.TFExecApplyFailedReason, err)
 			}
-		} else if !tf.Spec.EnableInventory {
+		} else if !tf.Spec.GetEnableInventory() {
 			tf.Status.Inventory = nil
 		}
 	}

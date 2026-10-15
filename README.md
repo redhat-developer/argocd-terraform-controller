@@ -28,8 +28,11 @@ Argo CD Application ──sync──▶ Terraform (infra.argocd.io)  ◀── U
 - **Outputs to a Secret**, health checks, `dependsOn` between stacks, destroy on
   deletion (optionally deleting the state too), state force-unlock.
 - **Argo CD integration** through supported extension points only: health
-  assessment and resource actions in `argocd-cm`, and a UI extension with a
-  *Terraform* tab (plan output, approve button) and an application view.
+  assessment and resource actions in `argocd-cm`, and a UI extension adding a
+  **Terraform** sidebar dashboard — every Terraform object across your
+  Applications, with a graph of what each one manages (Kubernetes or not: VPCs,
+  buckets, databases…), plan output and an approve button — plus a resource
+  tab and an application view.
 - **Isolation**: the controller holds source credentials and talks to a
   per-object runner Pod over mTLS; the runner only executes the binary with its
   own ServiceAccount.
@@ -85,7 +88,8 @@ spec:
 
 The Application shows the object as *Suspended* while a plan waits for approval,
 *Progressing* while applying and *Healthy* once applied, so later sync waves can
-depend on the infrastructure.
+depend on the infrastructure. The **Terraform** entry in the Argo CD sidebar
+lists every object and graphs the resources it manages.
 
 ## Documentation
 

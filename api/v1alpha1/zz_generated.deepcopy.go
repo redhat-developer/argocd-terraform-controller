@@ -697,6 +697,11 @@ func (in *TerraformSpec) DeepCopyInto(out *TerraformSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnableInventory != nil {
+		in, out := &in.EnableInventory, &out.EnableInventory
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Targets != nil {
 		in, out := &in.Targets, &out.Targets
 		*out = make([]string, len(*in))

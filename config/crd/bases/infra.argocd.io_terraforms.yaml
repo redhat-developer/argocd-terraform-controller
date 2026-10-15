@@ -207,7 +207,12 @@ spec:
                   detect drift. Defaults to false.
                 type: boolean
               enableInventory:
-                description: EnableInventory stores the applied resources in status.inventory.
+                default: true
+                description: |-
+                  EnableInventory records every resource managed by the state (type,
+                  address and provider identifier such as an ARN) in status.inventory
+                  after each apply. This is what the Argo CD UI dashboard uses to show
+                  non-Kubernetes resources. Disable for very large states. Defaults to true.
                 type: boolean
               fileMappings:
                 description: FileMappings is a list of files to create in the runner

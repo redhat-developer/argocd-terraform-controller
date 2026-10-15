@@ -5,7 +5,7 @@ cluster that already runs Argo CD in the `argocd` namespace. Set the two
 variables first.
 
 ```sh
-export VERSION=v0.0.2          # release of the Argo CD Terraform Controller
+export VERSION=v0.0.3          # release of the Argo CD Terraform Controller
 export TF_NAMESPACE=team-a     # namespace that will host Terraform objects
 ```
 
@@ -145,10 +145,13 @@ kubectl get namespace terraform-demo
 kubectl get configmap tfplan-default-terraform-sample-readable -n ${TF_NAMESPACE} -o jsonpath='{.data.tfplan}'
 ```
 
-In the Argo CD UI open the `terraform-sample` Application: the Terraform node
-has a **Terraform** tab (click the node, then the tab next to *Summary*), and
-the view switcher at the top of the page gains a **Terraform** view (cubes
-icon) listing every Terraform object of the Application.
+In the Argo CD UI click **Terraform** in the left sidebar: the dashboard lists
+`team-a/terraform-sample` with its state; click it for the graph (Git source →
+Terraform → the state/plan/outputs objects → the `kubernetes_namespace` and
+`kubernetes_config_map` resources it manages, with their IDs), the plan output,
+outputs, conditions and events. Inside the `terraform-sample` Application the
+Terraform node also has a **Terraform** tab, and the view switcher gains a
+**Terraform** view.
 
 ### Try manual approval
 

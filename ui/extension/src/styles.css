@@ -115,3 +115,45 @@
 
 .tf-ext__muted { color: #6d7f8b; }
 .tf-ext__empty { padding: 24px; text-align: center; color: #6d7f8b; }
+
+/* Sidebar dashboard */
+.tf-dash { padding: 20px 24px; max-width: 1400px; }
+.tf-dash__summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.tf-dash__stat {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid #e9eef2; border-radius: 20px; background: #fff;
+  padding: 4px 10px 4px 6px; cursor: pointer; font: inherit;
+}
+.tf-dash__stat--active { border-color: #0dadea; background: #e8f7fd; }
+.tf-dash__stat-count { font-weight: 600; font-size: 14px; min-width: 18px; text-align: center; }
+.tf-dash__search {
+  margin-left: auto; min-width: 280px; padding: 6px 10px;
+  border: 1px solid #d6dde3; border-radius: 4px; font: inherit;
+}
+.tf-dash__crumbs { margin-bottom: 12px; font-size: 14px; }
+.tf-dash__crumbs a { color: #0dadea; text-decoration: none; }
+
+/* Graph */
+.tf-graph { display: flex; align-items: flex-start; gap: 8px; overflow-x: auto; padding: 8px 0; }
+.tf-graph__col { display: flex; flex-direction: column; gap: 8px; min-width: 240px; max-width: 320px; }
+.tf-graph__col--wide { max-width: none; flex: 1; }
+.tf-graph__col-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #6d7f8b; }
+.tf-graph__arrow { align-self: flex-start; margin-top: 34px; color: #8fa4b1; font-size: 20px; }
+.tf-graph__node {
+  border: 1px solid #e9eef2; border-left-width: 4px; border-radius: 4px;
+  background: #fff; padding: 6px 10px; min-width: 0;
+}
+.tf-graph__node--source { border-left-color: #766f94; }
+.tf-graph__node--tf { border-left-color: #0dadea; }
+.tf-graph__node--k8s { border-left-color: #326ce5; }
+.tf-graph__node--res { border-left-color: #18be94; }
+.tf-graph__kind { font-size: 11px; color: #6d7f8b; text-transform: uppercase; letter-spacing: 0.03em; }
+.tf-graph__name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; overflow-wrap: anywhere; }
+.tf-graph__meta { font-size: 11px; color: #6d7f8b; overflow-wrap: anywhere; }
+.tf-graph__group { margin-bottom: 10px; }
+.tf-graph__group-title { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.tf-graph__group .tf-graph__node { margin-bottom: 4px; }
+.tf-graph__provider {
+  display: inline-block; padding: 0 6px; border-radius: 8px;
+  background: #e9eef2; font-size: 11px; font-weight: 600; text-transform: uppercase;
+}

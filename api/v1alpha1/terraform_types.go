@@ -286,9 +286,13 @@ type TerraformSpec struct {
 	// +optional
 	RefreshBeforeApply bool `json:"refreshBeforeApply,omitempty"`
 
-	// EnableInventory stores the applied resources in status.inventory.
+	// EnableInventory records every resource managed by the state (type,
+	// address and provider identifier such as an ARN) in status.inventory
+	// after each apply. This is what the Argo CD UI dashboard uses to show
+	// non-Kubernetes resources. Disable for very large states. Defaults to true.
+	// +kubebuilder:default:=true
 	// +optional
-	EnableInventory bool `json:"enableInventory,omitempty"`
+	EnableInventory *bool `json:"enableInventory,omitempty"`
 
 	// Targets limits plan/apply to the given resource addresses.
 	// +optional
@@ -641,6 +645,11 @@ func (in *Terraform) ShouldRetry() bool {
 // IncrementReconciliationFailures bumps the failure counter.
 func (in *Terraform) IncrementReconciliationFailures() {
 	in.Status.ReconciliationFailures++
+}
+
+// GetEnableInventory returns whether the inventory is recorded.
+func (in *TerraformSpec) GetEnableInventory() bool {
+	return in.EnableInventory == nil || *in.EnableInventory
 }
 
 // GetUpgradeOnInit returns whether init runs with -upgrade.

@@ -31,6 +31,7 @@ export interface TerraformSpec {
     oci?: { url: string; ref?: Record<string, string> };
   };
   runner?: { binary?: string; image?: string };
+  enableInventory?: boolean;
   writeOutputsToSecret?: { name: string; outputs?: string[] };
   tfstate?: { forceUnlock?: string; lockIdentifier?: string; deleteOnDestroy?: boolean };
   backendConfig?: { disable?: boolean; customConfiguration?: string; secretSuffix?: string };

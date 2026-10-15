@@ -3,6 +3,11 @@
 A [UI extension](https://argo-cd.readthedocs.io/en/stable/developer-guide/extensions/ui-extensions/)
 that adds:
 
+- a **Terraform** sidebar entry (`src/dashboard`): a dashboard of all Terraform
+  objects across Applications, with a per-object graph of the source, the
+  Kubernetes objects around it and every resource the state manages (from
+  `status.inventory`, Kubernetes or not), plan output, outputs, conditions,
+  events and the action buttons;
 - a **Terraform** tab on every `infra.argocd.io/Terraform` resource with the
   status, revisions, binary, human readable plan, outputs, inventory and
   conditions, plus *Approve plan*, *Re-plan*, *Suspend/Resume* and *Force

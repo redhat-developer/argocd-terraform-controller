@@ -86,18 +86,30 @@ is in the Ready condition message, the `TerraformPlanSucceed` event and the UI.
 
 ## UI extension
 
-The extension ([`ui/extension`](../ui/extension)) registers:
+The extension ([`ui/extension`](../ui/extension)) registers three things:
 
-- a **Terraform** tab on `infra.argocd.io/Terraform` resources: status, source,
-  approval mode, backend, revisions, binary, the human readable plan, outputs,
-  inventory, conditions and the action buttons;
-- a **Terraform** application view listing all Terraform objects of the
-  Application with their state and pending plans.
+- a **Terraform** entry in the sidebar (system-level extension at
+  `/extensions/terraform`): a dashboard of every Terraform object across all
+  Applications you can see — counts by state, search and filters, and a detail
+  page per object with a **graph** from the source, through the Terraform
+  object and its Kubernetes objects (state, plan, outputs, runner), to every
+  resource the state manages — including non-Kubernetes resources such as
+  VPCs, buckets or databases, grouped by provider and type with their IDs
+  (from `status.inventory`, recorded after each apply when
+  `spec.enableInventory` is true, the default). Plan output, outputs,
+  conditions, recent events and the action buttons are on the same page.
+- a **Terraform** tab on `infra.argocd.io/Terraform` resources inside an
+  Application;
+- a **Terraform** application view listing the Terraform objects of one
+  Application.
 
-It reads live objects through `GET /api/v1/applications/{app}/resource` and runs
-actions through `POST /api/v1/applications/{app}/resource/actions`; both are
-authorised by Argo CD RBAC (`applications, get` and `applications, action/infra.argocd.io/Terraform/<action>`).
-No backend service and no proxy extension are needed.
+Everything is read through the Argo CD API (`/api/v1/applications`,
+`…/{app}/resource`, `…/{app}/resource-tree`, `…/{app}/events`) and actions run
+through `POST …/{app}/resource/actions`; all of it is authorised by Argo CD RBAC
+(`applications, get` and `applications, action/infra.argocd.io/Terraform/<action>`).
+No backend service and no proxy extension are needed. Consequently the
+dashboard shows Terraform objects that are managed by an Argo CD Application;
+objects applied outside of Argo CD are not listed.
 
 The human readable plan is stored in a **ConfigMap** (`spec.storeReadablePlan: human`,
 the default) because Argo CD redacts Secret data in its API. The ConfigMap is

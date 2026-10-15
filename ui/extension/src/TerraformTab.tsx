@@ -37,9 +37,11 @@ interface DetailsProps {
   tf: Terraform;
   plan: string | null;
   onChanged: () => void;
+  /** Omit the inventory table (the dashboard shows it as a graph). */
+  hideInventory?: boolean;
 }
 
-export function TerraformDetails({ application, tf, plan, onChanged }: DetailsProps) {
+export function TerraformDetails({ application, tf, plan, onChanged, hideInventory }: DetailsProps) {
   const { phase: p, message } = phase(tf);
   const status = tf.status ?? {};
   const ready = condition(tf, 'Ready');
@@ -122,7 +124,7 @@ export function TerraformDetails({ application, tf, plan, onChanged }: DetailsPr
         )}
       </div>
 
-      {status.inventory?.entries?.length ? (
+      {!hideInventory && status.inventory?.entries?.length ? (
         <div className="tf-ext__section">
           <h4 className="tf-ext__section-title">Inventory ({status.inventory.entries.length})</h4>
           <table className="tf-ext__table">
