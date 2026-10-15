@@ -38,16 +38,20 @@ func run(t *testing.T, script, objYAML string) map[string]any {
 	if err := yaml.Unmarshal([]byte(objYAML), &obj); err != nil {
 		t.Fatalf("invalid fixture: %v", err)
 	}
+	// Mirror Argo CD's sandbox (util/lua/lua.go): only package, base and
+	// table are opened, and os is available solely through require("os").
+	// Notably there is no string library and no os global.
 	L := lua.NewState(lua.Options{SkipOpenLibs: true})
 	defer L.Close()
 	for _, pair := range []struct {
 		n string
 		f lua.LGFunction
-	}{{lua.BaseLibName, lua.OpenBase}, {lua.TabLibName, lua.OpenTable}, {lua.StringLibName, lua.OpenString}, {lua.OsLibName, lua.OpenOs}} {
+	}{{lua.LoadLibName, lua.OpenPackage}, {lua.BaseLibName, lua.OpenBase}, {lua.TabLibName, lua.OpenTable}} {
 		if err := L.CallByParam(lua.P{Fn: L.NewFunction(pair.f), NRet: 0, Protect: true}, lua.LString(pair.n)); err != nil {
 			t.Fatal(err)
 		}
 	}
+	L.PreloadModule(lua.OsLibName, lua.OpenOs)
 	L.SetGlobal("obj", toLua(L, obj))
 	if err := L.DoString(script); err != nil {
 		t.Fatalf("lua error: %v", err)
@@ -190,6 +194,26 @@ status:
     reason: TerraformPlannedWithChanges
     message: "Plan generated"
 `, "Progressing", "Plan generated"},
+		{"pending approved by prefix", base + `  approvePlan: plan-main-abc
+status:
+  plan:
+    pending: plan-main-abc123
+  conditions:
+  - type: Ready
+    status: "Unknown"
+    reason: TerraformPlannedWithChanges
+    message: "Plan generated"
+`, "Progressing", "Plan generated"},
+		{"pending with non-matching approvePlan", base + `  approvePlan: plan-main-abd
+status:
+  plan:
+    pending: plan-main-abc123
+  conditions:
+  - type: Ready
+    status: "Unknown"
+    reason: TerraformPlannedWithChanges
+    message: "Plan generated"
+`, "Suspended", "plan-main-abc123"},
 		{"pending auto", base + `  approvePlan: auto
 status:
   plan:
@@ -298,6 +322,16 @@ status:
 	approved := run(t, discovery, base+"  approvePlan: auto\nstatus:\n  plan:\n    pending: plan-x\n")
 	if dig(approved, "approve-plan", "disabled") != true {
 		t.Error("approve-plan must be disabled when approvePlan is auto")
+	}
+
+	// approvePlan matches the pending plan by prefix, like the controller.
+	for approve, want := range map[string]bool{
+		"plan-main-abc123": true, "plan-main-abc": true, "plan-main": true, "plan-main-abc124": false, "plan-main-abc1234": false, "plan-mai": true, "plan-x": false, "": false,
+	} {
+		got := run(t, discovery, base+"  approvePlan: "+approve+"\nstatus:\n  plan:\n    pending: plan-main-abc123\n")
+		if dig(got, "approve-plan", "disabled") != want {
+			t.Errorf("approvePlan=%q: approve-plan disabled = %v, want %v", approve, dig(got, "approve-plan", "disabled"), want)
+		}
 	}
 
 	locked := run(t, discovery, base+"  suspend: true\nstatus:\n  lock:\n    pending: lock-1\n")
