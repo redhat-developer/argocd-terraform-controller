@@ -4,13 +4,33 @@ Run Terraform and OpenTofu from Argo CD, GitOps style, with plan approval, drift
 detection and a UI extension. It is an **add-on**: no changes to Argo CD are
 required. The design follows the Flux [tofu-controller](https://github.com/flux-iac/tofu-controller).
 
-```
-Argo CD Application ──sync──▶ Terraform (infra.argocd.io)  ◀── UI extension / health / actions
-                                   │
-                                   ▼ controller: fetch source, plan, approve, apply, drift
-                                   │ gRPC + mTLS
-                                   ▼
-                              runner Pod: tofu | terraform  ──▶ state Secret, plan, outputs
+```mermaid
+flowchart TB
+    subgraph argocd[Argo CD]
+        app[Application]
+        ui[UI extension<br/>health · actions]
+    end
+
+    tf[Terraform<br/>infra.argocd.io/v1alpha1]
+    ctrl[Controller<br/>fetch source · plan · approve · apply · drift]
+    runner[Runner Pod<br/>tofu or terraform]
+
+    subgraph out[Results]
+        state[(State Secret)]
+        plan[Plan Secret<br/>+ readable ConfigMap]
+        outputs[Outputs Secret]
+    end
+
+    cloud[(Cloud / provider<br/>resources)]
+
+    app -- sync --> tf
+    ui -. read / approve .-> tf
+    tf --> ctrl
+    ctrl -- gRPC + mTLS --> runner
+    runner --> state
+    runner --> plan
+    runner --> outputs
+    runner --> cloud
 ```
 
 ## Features
