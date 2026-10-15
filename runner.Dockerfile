@@ -6,7 +6,8 @@ ARG BASE_IMAGE=golang:1.26
 ARG TERRAFORM_VERSION=1.16.6
 ARG TOFU_VERSION=1.13.1
 
-FROM ${BASE_IMAGE} AS builder
+# Build on the host platform and cross-compile; Go does not need emulation.
+FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -20,7 +21,7 @@ COPY . .
 ARG VERSION=dev
 ARG COMMIT=unknown
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
-    go build -a \
+    go build \
       -ldflags "-X main.Version=${VERSION} -X main.Commit=${COMMIT}" \
       -o runner ./cmd/runner
 
