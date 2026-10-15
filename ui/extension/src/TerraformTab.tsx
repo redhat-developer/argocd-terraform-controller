@@ -3,20 +3,22 @@ import React from 'react';
 import { getReadablePlan, getTerraform } from './api';
 import { Actions, Badge, Field, Message, PlanOutput, usePolling } from './components';
 import { approvalMode, backendSummary, condition, phase, planSummary, shortRevision, sourceSummary, timeAgo } from './model';
+import { resourceRef } from './types';
 import type { ResourceExtensionProps, Terraform } from './types';
 
 const POLL_MS = 5000;
 
 /** The "Terraform" tab shown in the resource sliding panel. */
 export default function TerraformTab({ application, resource, tree }: ResourceExtensionProps) {
+  const ref = resourceRef(resource);
   const { value, error, reload } = usePolling(
     async () => {
-      const tf = await getTerraform(application, resource);
+      const tf = await getTerraform(application, ref);
       const plan = await getReadablePlan(application, tree, tf).catch(() => null);
       return { tf, plan };
     },
     POLL_MS,
-    [application.metadata.name, resource.name, resource.namespace, tree.nodes?.length],
+    [application.metadata.name, ref.name, ref.namespace, tree.nodes?.length],
   );
 
   if (error && !value) {

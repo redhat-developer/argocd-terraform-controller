@@ -95,10 +95,26 @@ export interface Application {
   };
 }
 
+/**
+ * Argo CD passes the live Kubernetes object (`State`) as `resource` to
+ * resource tab extensions (resource-details.tsx), not the tree node.
+ * Older builds and some docs show a tree node, so both are accepted.
+ */
+export type ResourceExtensionResource = { metadata: ObjectMeta } | ResourceNode;
+
 export interface ResourceExtensionProps {
   application: Application;
-  resource: ResourceNode & { status?: unknown };
+  resource: ResourceExtensionResource;
   tree: ApplicationTree;
+}
+
+/** Name/namespace of a resource tab `resource` prop, whatever shape it has. */
+export function resourceRef(resource: ResourceExtensionResource): { name: string; namespace: string } {
+  if ('metadata' in resource && resource.metadata) {
+    return { name: resource.metadata.name, namespace: resource.metadata.namespace ?? '' };
+  }
+  const node = resource as ResourceNode;
+  return { name: node.name, namespace: node.namespace };
 }
 
 export interface AppViewExtensionProps {

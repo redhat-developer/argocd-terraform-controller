@@ -15,6 +15,14 @@ that adds:
 - a **Terraform** application view listing all Terraform objects of an
   Application and the ones waiting for approval.
 
+The sidebar entry is registered only after Argo CD's `<App>` has rendered:
+since Argo CD v3.5 (React 18) the `systemLevel` listener is attached
+asynchronously and an extension that registers synchronously from
+`extensions.js` is silently dropped
+([argoproj/argo-cd#29095](https://github.com/argoproj/argo-cd/issues/29095)).
+The resource tab receives the **live Kubernetes object** as `resource` (not the
+tree node), see `resourceRef` in `src/types.ts`.
+
 The extension talks only to the Argo CD API server (`/api/v1/applications/…/resource`
 and `…/resource/actions`), so it is subject to Argo CD RBAC and needs no
 backend. The buttons run the resource actions defined in
