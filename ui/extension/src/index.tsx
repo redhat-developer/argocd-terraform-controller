@@ -24,6 +24,11 @@ if (api) {
   // Per-resource tab and per-Application view. These are pulled from the
   // registry at render time, so they can be registered right away.
   api.registerResourceExtension(TerraformTab, TERRAFORM_GROUP, TERRAFORM_KIND, 'Terraform', { icon: 'fa-cubes' });
+  // Tab in the Application details panel (Summary / Parameters / Manifest /
+  // Events / Terraform). Argo CD renders Application-kind tabs with
+  // resource={application}, so the app view component fits as is. Resource
+  // tabs have no shouldDisplay hook, so it shows on every Application.
+  api.registerResourceExtension(AppView, 'argoproj.io', 'Application', 'Terraform', { icon: 'fa-cubes' });
   api.registerAppViewExtension(AppView, 'Terraform', 'fa-cubes', shouldDisplay);
 
   // Sidebar entry: the Terraform dashboard across all Applications.

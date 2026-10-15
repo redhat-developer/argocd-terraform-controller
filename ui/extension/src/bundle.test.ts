@@ -25,16 +25,17 @@ describe('built bundle', () => {
     // Resource/app-view extensions are read on demand; registered immediately.
     expect(calls).toEqual([
       ['resource', 'infra.argocd.io', 'Terraform', 'Terraform'],
+      ['resource', 'argoproj.io', 'Application', 'Terraform'],
       ['appview', 'Terraform', 'fa-cubes', 'function'],
     ]);
     expect(document.head.querySelector('style')?.textContent).toContain('.tf-ext');
 
     // The sidebar entry waits for Argo CD's <App> to mount (argoproj/argo-cd#29095).
     await vi.advanceTimersByTimeAsync(500);
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
     app.appendChild(document.createElement('div'));
     await vi.advanceTimersByTimeAsync(100);
-    expect(calls[2]).toEqual(['system', 'Terraform', '/terraform', 'fa-cubes']);
+    expect(calls[3]).toEqual(['system', 'Terraform', '/terraform', 'fa-cubes']);
     vi.useRealTimers();
     app.remove();
   });

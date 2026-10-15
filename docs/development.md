@@ -65,6 +65,9 @@ health logic in `ui/extension/src/model.ts`; keep them in sync.
 
 ## Releasing
 
-Tag `vX.Y.Z`. CI pushes the `quay.io/redhatworkshops/argocd-terraform-controller-{manager,runner}` images, builds the
+Bump `export VERSION=vX.Y.Z` in `docs/getting-started.md` so the guide stays
+copy-pasteable (`make verify-release-version TAG=vX.Y.Z` checks it; the Release
+workflow fails early if it does not match the tag), then tag `vX.Y.Z`. CI
+pushes the `quay.io/redhatworkshops/argocd-terraform-controller-{manager,runner}` images, builds the
 UI extension tarball, the install manifest, the Argo CD patches and the Helm
 chart, and attaches them to the GitHub release.

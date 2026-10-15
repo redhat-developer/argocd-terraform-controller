@@ -52,7 +52,7 @@ flowchart TB
   **Terraform** sidebar dashboard — every Terraform object across your
   Applications, with a graph of what each one manages (Kubernetes or not: VPCs,
   buckets, databases…), plan output and an approve button — plus a resource
-  tab and an application view.
+  tab, an Application details tab and an application view.
 - **Isolation**: the controller holds source credentials and talks to a
   per-object runner Pod over mTLS; the runner only executes the binary with its
   own ServiceAccount.

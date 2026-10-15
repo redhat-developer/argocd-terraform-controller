@@ -100,8 +100,9 @@ The extension ([`ui/extension`](../ui/extension)) registers three things:
   conditions, recent events and the action buttons are on the same page.
 - a **Terraform** tab on `infra.argocd.io/Terraform` resources inside an
   Application;
-- a **Terraform** application view listing the Terraform objects of one
-  Application.
+- a **Terraform** tab in the Application details panel (next to Summary,
+  Parameters, Manifest and Events) and a **Terraform** application view in the
+  toolbar, both listing the Terraform objects of one Application.
 
 Everything is read through the Argo CD API (`/api/v1/applications`,
 `…/{app}/resource`, `…/{app}/resource-tree`, `…/{app}/events`) and actions run
@@ -120,7 +121,9 @@ The extension is installed by the
 init container in `argocd-server-extension-patch.yaml`, downloading
 `argocd-terraform-extension.tar.gz` from a GitHub release. The application view
 appears when the Application's resources include a Terraform object or when the
-Application has the label `infra.argocd.io/has-terraform: "true"`.
+Application has the label `infra.argocd.io/has-terraform: "true"`; the details
+panel tab is always present (Argo CD has no per-Application filter for resource
+tabs) and says so when the Application manages no Terraform objects.
 
 ## Reusing Argo CD repository credentials
 

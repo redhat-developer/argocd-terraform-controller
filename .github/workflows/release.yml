@@ -18,6 +18,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Verify the getting started guide pins this release
+        env:
+          TAG: ${{ github.ref_name }}
+        run: make verify-release-version TAG="${TAG}"
+
       - name: Setup Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:

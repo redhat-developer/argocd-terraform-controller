@@ -12,8 +12,9 @@ that adds:
   status, revisions, binary, human readable plan, outputs, inventory and
   conditions, plus *Approve plan*, *Re-plan*, *Suspend/Resume* and *Force
   unlock* buttons;
-- a **Terraform** application view listing all Terraform objects of an
-  Application and the ones waiting for approval.
+- a **Terraform** tab in the Application details panel and a **Terraform**
+  application view, both listing all Terraform objects of an Application and
+  the ones waiting for approval.
 
 The sidebar entry is registered only after Argo CD's `<App>` has rendered:
 since Argo CD v3.5 (React 18) the `systemLevel` listener is attached

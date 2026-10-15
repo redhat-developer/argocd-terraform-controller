@@ -81,6 +81,15 @@ helm-lint: helm-sync-crds ## Lint and render the Helm chart.
 verify-argocd-overlay: kustomize ## Build the Argo CD component against the upstream install manifests.
 	"$(KUSTOMIZE)" build hack/argocd-overlay-test > /dev/null
 
+.PHONY: verify-release-version
+verify-release-version: ## Check docs/getting-started.md pins the release being tagged (TAG=vX.Y.Z).
+	@test -n "$(TAG)" || { echo "TAG is required, e.g. make verify-release-version TAG=v0.1.0"; exit 1; }
+	@grep -qx 'export VERSION=$(TAG) *\(#.*\)\?' docs/getting-started.md || { \
+		echo "docs/getting-started.md does not pin $(TAG); it has:"; \
+		grep -n '^export VERSION=' docs/getting-started.md || true; \
+		echo "Update the VERSION line so the guide stays copy-pasteable, then re-tag."; \
+		exit 1; }
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
