@@ -1,4 +1,4 @@
-# Development
+# Developer Guide
 
 ## Layout
 
@@ -30,6 +30,7 @@ make docker-build docker-build-runner
 make test-e2e               # kind: builds images, deploys, applies with tofu and terraform
 make ui-test ui-build build-extension   # UI, in a node:22 container
 make helm-lint verify-argocd-overlay
+make build-docs serve-docs   # documentation site, in a python:3.12 container
 ```
 
 The envtest suite starts the controller with `INSECURE_LOCAL_RUNNER=1` and an
@@ -71,3 +72,33 @@ workflow fails early if it does not match the tag), then tag `vX.Y.Z`. CI
 pushes the `quay.io/redhatworkshops/argocd-terraform-controller-{manager,runner}` images, builds the
 UI extension tarball, the install manifest, the Argo CD patches and the Helm
 chart, and attaches them to the GitHub release.
+
+## Documentation site
+
+The docs are MkDocs with the Material theme, configured like the Argo CD docs:
+`mkdocs.yml` at the repository root, sources under `docs/`, Python
+requirements in `docs/requirements.txt`. Nothing needs to be installed on the
+host:
+
+```sh
+make serve-docs             # live reload on http://localhost:8000
+make build-docs             # strict build into site/ (what CI runs)
+```
+
+`strict: true` turns broken links, missing nav entries and unknown relative
+links into build failures. Links from docs to files in the repository (code,
+manifests) must be absolute GitHub URLs; links between pages are relative
+`.md` paths. GitHub-style callouts (`> [!NOTE]`) render on both GitHub and the
+site through the `gh-admonitions` plugin.
+
+The `Docs` workflow (`.github/workflows/docs.yml`) runs only when `docs/**`,
+`mkdocs.yml` or `.readthedocs.yaml` change: pull requests get a strict build;
+pushes to `main` also deploy to the `gh-pages` branch, served at
+<https://redhat-developer.github.io/argocd-terraform-controller/>. The other
+workflows ignore documentation changes.
+
+The configuration is Read the Docs-ready (`.readthedocs.yaml`, like
+`argoproj/argo-cd`). To move the site there: import the repository on
+readthedocs.org, which picks up `.readthedocs.yaml` and sets
+`READTHEDOCS_CANONICAL_URL` (used by `site_url` in `mkdocs.yml`), then remove
+the `deploy` job from `docs.yml` and delete the `gh-pages` branch.

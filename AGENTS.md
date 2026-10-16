@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-See docs/development.md for the authoritative layout. In short:
+See docs/developer-guide/index.md for the authoritative layout. In short:
 ```
 cmd/manager, cmd/runner       Controller and runner entry points
 api/v1alpha1/*_types.go       CRD schema (+kubebuilder markers); zz_generated.* is generated

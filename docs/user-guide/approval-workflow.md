@@ -55,13 +55,37 @@ The controller clears `status.plan.pending` and re-plans when:
   *Re-plan* action) while the plan is unapproved;
 - `spec.planOnly` and the revision changes.
 
+## Approving from a pipeline
+
+Because the plan ID is deterministic for a revision, approval can be automated
+without giving up the gate — for example, a CI job that runs after a human
+review of the plan in the Argo CD UI, or a ChatOps command:
+
+```sh
+PLAN=$(kubectl -n team-a get tf network -o jsonpath='{.status.plan.pending}')
+test -n "$PLAN" || { echo "nothing to approve"; exit 0; }
+kubectl -n team-a patch tf network --type merge -p "{\"spec\":{\"approvePlan\":\"$PLAN\"}}"
+```
+
+Or, GitOps-style, have the pipeline commit the ID to the manifest in Git and
+let Argo CD sync it. The prefix match (`plan-main`) is convenient for
+"approve whatever `main` currently plans" in lower environments, but it also
+approves *future* plans for that ref — treat it like `auto` with a delay.
+
+## Plan-only mode
+
+`spec.planOnly: true` produces and stores plans but never applies, regardless
+of `approvePlan`. The object is **Healthy** with the plan attached, so an
+Application can show "here is what would change" without blocking anything.
+Use it for review environments, or as a dry-run before flipping to manual
+approval.
+
 ## Destroy
 
 `spec.destroy: true` plans a destroy of everything in the state; the same
-approval rules apply. `spec.destroyResourcesOnDeletion: true` does the same when
-the object is deleted (Argo CD prune), then removes plan and outputs objects.
-With `spec.tfstate.deleteOnDestroy: true` the state Secret and lock Lease are
-deleted too once the destroy succeeded.
+approval rules apply. Deleting an object with
+`spec.destroyResourcesOnDeletion: true` does the same during finalization.
+Both are covered in [Destroy and deletion](destroy-and-deletion.md).
 
 ## Failures and retries
 

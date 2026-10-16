@@ -73,7 +73,7 @@ kubectl create clusterrolebinding tf-runner-${TF_NAMESPACE}-sample \
 ## 3. Integrate with Argo CD
 
 Three configuration-only changes to a stock Argo CD (details in
-[argocd-integration.md](argocd-integration.md)):
+[Argo CD integration](operator-manual/argocd-integration.md)):
 
 ```sh
 # Health assessment and resource actions (approve-plan, replan, suspend, resume, force-unlock)
@@ -125,8 +125,8 @@ spec:
 EOF
 ```
 
-The sample ([config/samples/infra_v1alpha1_terraform.yaml](../config/samples/infra_v1alpha1_terraform.yaml))
-fetches [examples/kube-namespace](../examples/kube-namespace) from Git, runs
+The sample ([config/samples/infra_v1alpha1_terraform.yaml](https://github.com/redhat-developer/argocd-terraform-controller/blob/main/config/samples/infra_v1alpha1_terraform.yaml))
+fetches [examples/kube-namespace](https://github.com/redhat-developer/argocd-terraform-controller/blob/main/examples/kube-namespace) from Git, runs
 it with `approvePlan: auto`, writes the outputs to the Secret
 `terraform-sample-outputs` and destroys the resources when the object is deleted.
 
@@ -171,7 +171,7 @@ kubectl patch terraform terraform-sample -n ${TF_NAMESPACE} --type merge -p "{\"
 
 (The Application shows the patched object as OutOfSync; with
 `automated.selfHeal` Argo CD would revert it — see the GitOps considerations in
-[argocd-integration.md](argocd-integration.md).)
+[Argo CD integration](operator-manual/argocd-integration.md).)
 
 ## 5. Clean up
 
@@ -184,51 +184,11 @@ kubectl delete -f https://github.com/redhat-developer/argocd-terraform-controlle
 ## Using cloud credentials
 
 The sample above only needs Kubernetes access, so the runner's ServiceAccount
-is enough. Real stacks need provider credentials. Two common ways, both
-without touching the Terraform code; the runner Pod is where Terraform runs,
-so that is where credentials must end up.
-
-**Static credentials file** — mount an existing `~/.aws/credentials` into the
-runner home with `spec.fileMappings`. The provider keeps using
-`profile = "<name>"` exactly as on your laptop:
-
-```sh
-kubectl -n ${TF_NAMESPACE} create secret generic aws-credentials \
-  --from-file=credentials=$HOME/.aws/credentials
-```
-
-```yaml
-spec:
-  fileMappings:
-    - secretRef:
-        name: aws-credentials
-        key: credentials
-      location: home               # /home/runner
-      path: .aws/credentials       # → /home/runner/.aws/credentials
-```
-
-**Workload identity (EKS)** — no secret at all: map the runner ServiceAccount
-(`tf-runner` in the object's namespace, or `spec.runner.serviceAccountName`)
-to an IAM role, either with IRSA
-(`kubectl -n ${TF_NAMESPACE} annotate sa tf-runner eks.amazonaws.com/role-arn=<arn>`)
-or EKS Pod Identity
-(`aws eks create-pod-identity-association --namespace ${TF_NAMESPACE} --service-account tf-runner --role-arn <arn> …`).
-Leave `profile` unset in the provider and let the runner read the projected
-token:
-
-```yaml
-spec:
-  runner:
-    podTemplate:
-      spec:
-        securityContext:
-          fsGroup: 65532           # runner is non-root; makes the token readable
-```
-
-Other providers work the same way: env vars via
-`spec.runner.podTemplate.spec.env`/`envFrom`, files via `spec.fileMappings`,
-or the equivalent workload identity (GKE Workload Identity, Azure Workload
-Identity) on the runner ServiceAccount.
+is enough. Real stacks need provider credentials delivered to the runner Pod:
+a credentials file through `spec.fileMappings`, environment variables through
+`spec.runner.podTemplate.spec.envFrom`, or workload identity on the `tf-runner`
+ServiceAccount. All three, with copy-and-paste examples, are in
+[Variables and credentials](user-guide/variables-and-credentials.md).
 
 ## What happens on each reconciliation
 

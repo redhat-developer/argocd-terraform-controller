@@ -2,7 +2,17 @@ name: UI extension
 
 on:
   push:
+    paths-ignore:
+      - docs/**
+      - '**.md'
+      - mkdocs.yml
+      - .readthedocs.yaml
   pull_request:
+    paths-ignore:
+      - docs/**
+      - '**.md'
+      - mkdocs.yml
+      - .readthedocs.yaml
 
 permissions: {}
 

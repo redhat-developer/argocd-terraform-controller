@@ -4,6 +4,8 @@ Run Terraform and OpenTofu from Argo CD, GitOps style, with plan approval, drift
 detection and a UI extension. It is an **add-on**: no changes to Argo CD are
 required. The design follows the Flux [tofu-controller](https://github.com/flux-iac/tofu-controller).
 
+**Documentation:** <https://redhat-developer.github.io/argocd-terraform-controller/>
+
 ```mermaid
 flowchart TB
     subgraph argocd[Argo CD]
@@ -75,7 +77,7 @@ kustomize build https://github.com/redhat-developer/argocd-terraform-controller/
 ```
 
 Integrate with Argo CD (health, actions, UI extension) — see
-[docs/argocd-integration.md](docs/argocd-integration.md):
+[Argo CD integration](docs/operator-manual/argocd-integration.md):
 
 ```sh
 RELEASE=https://github.com/redhat-developer/argocd-terraform-controller/releases/latest/download
@@ -113,14 +115,14 @@ lists every object and graphs the resources it manages.
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md)
-- [Argo CD integration](docs/argocd-integration.md) — health, actions, UI extension, RBAC, GitOps considerations
-- [Plan approval workflow](docs/approval-workflow.md)
-- [State backends, backup and restore](docs/state.md)
-- [Terraform vs OpenTofu](docs/binaries.md)
-- [Sources and credentials](docs/sources.md)
-- [API reference](docs/api.md) — the generated CRD schema is also browsable at [doc.crds.dev](https://doc.crds.dev/github.com/redhat-developer/argocd-terraform-controller)
-- [Development](docs/development.md)
+Full documentation is at <https://redhat-developer.github.io/argocd-terraform-controller/>
+(sources in [`docs/`](docs/)).
+
+- [Getting started](https://redhat-developer.github.io/argocd-terraform-controller/getting-started/)
+- [Operator Manual](https://redhat-developer.github.io/argocd-terraform-controller/operator-manual/) — installation and upgrades, Argo CD integration, state backends, Terraform vs OpenTofu
+- [User Guide](https://redhat-developer.github.io/argocd-terraform-controller/user-guide/) — plan approval, sources, variables and credentials, specification reference
+- [Developer Guide](https://redhat-developer.github.io/argocd-terraform-controller/developer-guide/)
+- The generated CRD schema is also browsable at [doc.crds.dev](https://doc.crds.dev/github.com/redhat-developer/argocd-terraform-controller)
 
 ## Status
 

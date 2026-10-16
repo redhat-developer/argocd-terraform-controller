@@ -1,6 +1,13 @@
 # API reference: `infra.argocd.io/v1alpha1` Terraform
 
-Short names: `tf`. Namespaced. Printer columns: Ready, Plan (pending), Status, Age.
+> [!TIP]
+> The generated CRD schema, with every field's type, validation and description,
+> is browsable at **[doc.crds.dev](https://doc.crds.dev/github.com/redhat-developer/argocd-terraform-controller)**.
+> This page is the annotated summary.
+
+Short names: `tf`. Namespaced. Printer columns: `Ready`, `Plan` (pending plan
+ID), `Status` (Ready condition message) and, with `-o wide`, `Applied`
+(last applied revision).
 
 ## spec
 

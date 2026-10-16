@@ -1,0 +1,78 @@
+site_name: Argo CD Terraform Controller
+site_description: Run Terraform and OpenTofu from Argo CD, GitOps style, with plan approval, drift detection and a UI extension.
+# Read the Docs sets READTHEDOCS_CANONICAL_URL; GitHub Pages uses the default.
+site_url: !ENV [READTHEDOCS_CANONICAL_URL, 'https://redhat-developer.github.io/argocd-terraform-controller/']
+repo_url: https://github.com/redhat-developer/argocd-terraform-controller
+edit_uri: edit/main/docs/
+exclude_docs: requirements.txt
+strict: true
+
+theme:
+  name: material
+  font:
+    text: Work Sans
+  features:
+    - content.action.edit
+    - content.code.copy
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      scheme: default
+      primary: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: '(prefers-color-scheme: dark)'
+      scheme: slate
+      primary: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - gh-admonitions
+
+markdown_extensions:
+  - markdown_include.include
+  - attr_list
+  - codehilite:
+      css_class: highlight
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Overview: index.md
+  - getting-started.md
+  - Operator Manual:
+      - operator-manual/index.md
+      - operator-manual/architecture.md
+      - operator-manual/installation.md
+      - operator-manual/controller-configuration.md
+      - operator-manual/argocd-integration.md
+      - operator-manual/state.md
+      - operator-manual/binaries.md
+      - operator-manual/security.md
+      - operator-manual/metrics.md
+      - operator-manual/troubleshooting.md
+  - User Guide:
+      - user-guide/index.md
+      - user-guide/approval-workflow.md
+      - user-guide/sources.md
+      - user-guide/variables-and-credentials.md
+      - user-guide/drift-detection.md
+      - user-guide/outputs.md
+      - user-guide/dependencies-and-health-checks.md
+      - user-guide/destroy-and-deletion.md
+      - user-guide/runner.md
+      - user-guide/examples.md
+      - Terraform Specification Reference: user-guide/api.md
+  - Developer Guide:
+      - developer-guide/index.md
+  - faq.md
+  - Releases ⧉: https://github.com/redhat-developer/argocd-terraform-controller/releases

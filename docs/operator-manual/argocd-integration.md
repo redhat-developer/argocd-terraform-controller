@@ -1,7 +1,7 @@
 # Argo CD integration
 
 Everything here is configuration of a stock Argo CD; no Argo CD code or image
-changes are involved. The pieces live in [`config/argocd`](../config/argocd)
+changes are involved. The pieces live in [`config/argocd`](https://github.com/redhat-developer/argocd-terraform-controller/blob/main/config/argocd)
 and are packaged as a Kustomize **Component**.
 
 ## Install
@@ -31,7 +31,7 @@ server patch into `server.initContainers`, `server.volumeMounts`, `server.volume
 
 ## Health assessment
 
-[`config/argocd/lua/health.lua`](../config/argocd/lua/health.lua) maps a
+[`config/argocd/lua/health.lua`](https://github.com/redhat-developer/argocd-terraform-controller/blob/main/config/argocd/lua/health.lua) maps a
 Terraform object to an Argo CD health:
 
 | Health | When |
@@ -48,7 +48,7 @@ and the apply.
 
 ## Resource actions
 
-[`config/argocd/lua/actions`](../config/argocd/lua/actions) defines actions
+[`config/argocd/lua/actions`](https://github.com/redhat-developer/argocd-terraform-controller/blob/main/config/argocd/lua/actions) defines actions
 available from the resource menu, the Argo CD CLI (`argocd app actions run`)
 and the UI extension buttons:
 
@@ -86,7 +86,7 @@ is in the Ready condition message, the `TerraformPlanSucceed` event and the UI.
 
 ## UI extension
 
-The extension ([`ui/extension`](../ui/extension)) registers three things:
+The extension ([`ui/extension`](https://github.com/redhat-developer/argocd-terraform-controller/blob/main/ui/extension)) registers three things:
 
 - a **Terraform** entry in the sidebar (system-level extension at
   `/extensions/terraform`): a dashboard of every Terraform object across all

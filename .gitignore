@@ -40,3 +40,7 @@ ui/extension/dist
 
 # Release artifacts
 dist/
+
+# Documentation site build output and pip cache (make build-docs / serve-docs)
+site/
+.docs-pip-cache/

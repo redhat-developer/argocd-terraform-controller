@@ -129,6 +129,73 @@ Migrating to another backend: change `spec.backendConfig`; `init` runs with
 `-force-copy`, so Terraform migrates the state to the new backend on the next
 run. Take a backup first.
 
+## Working with the state from the CLI
+
+Sometimes you need `terraform state`, `terraform import` or `terraform
+taint` by hand. The Kubernetes backend works from a laptop too; the only
+difference from the runner is `in_cluster_config = false`, which makes the
+backend use your kubeconfig.
+
+1. **Suspend the object** so the controller does not run concurrently:
+
+    ```sh
+    kubectl -n team-a patch tf network --type merge -p '{"spec":{"suspend":true}}'
+    ```
+
+2. **Point a working copy at the same Secret.** Clone the object's source
+   and, in its `path`, add an override file (do not commit it):
+
+    ```hcl
+    # backend_override.tf
+    terraform {
+      backend "kubernetes" {
+        secret_suffix     = "network"   # spec.backendConfig.secretSuffix, default: object name
+        namespace         = "team-a"
+        in_cluster_config = false
+        # labels          = { … }       # only if spec.backendConfig.labels is set
+      }
+    }
+    ```
+
+    ```sh
+    terraform init                       # or: tofu init — use the same family as status.binary
+    terraform workspace select default   # only if spec.workspace is set to something else
+    ```
+
+    Your kubeconfig user needs `get`/`create`/`update` on Secrets and Leases
+    in that namespace; the `argocd-terraform-controller-runner-role`
+    ClusterRole is a convenient reference. Provider credentials must be in
+    your shell as usual.
+
+3. **Operate**:
+
+    ```sh
+    terraform state list
+    terraform state show aws_s3_bucket.logs
+    terraform import aws_s3_bucket.legacy legacy-bucket-name
+    terraform state rm aws_instance.old
+    terraform force-unlock <lock id>
+    ```
+
+4. **Resume**:
+
+    ```sh
+    kubectl -n team-a patch tf network --type merge -p '{"spec":{"suspend":false}}'
+    ```
+
+    The next reconcile plans against the modified state. If you changed the
+    state in a way that the configuration does not reflect, that plan will
+    show it — which is the point.
+
+> [!WARNING]
+> There is no local copy: the Secret *is* the state. Anything you do with the
+> CLI is immediately what the controller sees. Take a backup first (above).
+> And resist `terraform destroy` from the CLI unless you also delete or change
+> the object — otherwise the controller recreates everything on the next run
+> because the source still declares it. The GitOps way to destroy is
+> `spec.destroy: true` or deleting the object with
+> `destroyResourcesOnDeletion`; see [Destroy and deletion](../user-guide/destroy-and-deletion.md).
+
 ## Security notes
 
 - Enable [encryption at rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)

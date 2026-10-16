@@ -241,6 +241,27 @@ build-extension: ui-build ui-test ## Package the UI extension release tarball an
 	cd dist && sha256sum argocd-terraform-extension.tar.gz > checksums.txt
 	@echo "built dist/argocd-terraform-extension.tar.gz"
 
+##@ Documentation (MkDocs in a container; no host Python packages needed)
+
+DOCS_IMAGE ?= docker.io/library/python:3.12-alpine
+DOCS_PORT ?= 8000
+# docs-run executes a command inside the Python image with the repository
+# mounted at /docs. mkdocs and its plugins are installed into a cached
+# directory on every run (cheap after the first time).
+define docs-run
+$(CONTAINER_TOOL) run --rm $(DOCS_TTY) $(DOCS_PUBLISH) -v "$(shell pwd):/docs:z" -w /docs -u "$(shell id -u):$(shell id -g)" -e HOME=/tmp -e PIP_CACHE_DIR=/docs/.docs-pip-cache/pip -e PYTHONUSERBASE=/docs/.docs-pip-cache/user -e PATH=/docs/.docs-pip-cache/user/bin:/usr/local/bin:/usr/bin:/bin $(DOCS_IMAGE) sh -c 'pip install --quiet --user -r docs/requirements.txt && $(1)'
+endef
+
+.PHONY: build-docs
+build-docs: ## Build the documentation site into site/ (strict: broken links and nav entries fail).
+	$(call docs-run,mkdocs build --strict)
+
+.PHONY: serve-docs
+serve-docs: ## Serve the documentation with live reload on http://localhost:8000 (override with DOCS_PORT).
+	$(call docs-run,mkdocs serve --dev-addr 0.0.0.0:$(DOCS_PORT))
+serve-docs: DOCS_TTY = -it
+serve-docs: DOCS_PUBLISH = -p $(DOCS_PORT):$(DOCS_PORT)
+
 ##@ Deployment
 
 ifndef ignore-not-found

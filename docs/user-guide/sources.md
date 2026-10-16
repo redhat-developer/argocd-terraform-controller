@@ -48,7 +48,7 @@ kubectl create secret generic infra-git-credentials -n team-a \
 `url` matches (exact `repository` Secret first, then the longest `repo-creds`
 prefix) and the `argocd-ssh-known-hosts-cm` ConfigMap. Requires the controller
 to run with `--argocd-namespace` and to be allowed to read Secrets there
-(see [argocd-integration.md](argocd-integration.md)). If nothing matches the
+(see [Argo CD integration](../operator-manual/argocd-integration.md)). If nothing matches the
 fetch proceeds anonymously.
 
 ## OCI artifacts
