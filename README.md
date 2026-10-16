@@ -82,7 +82,10 @@ Integrate with Argo CD (health, actions, UI extension) — see
 ```sh
 RELEASE=https://github.com/redhat-developer/argocd-terraform-controller/releases/latest/download
 kubectl patch configmap argocd-cm -n argocd --type merge --patch "$(curl -fsSL ${RELEASE}/argocd-cm-patch.yaml)"
-kubectl patch deployment argocd-server -n argocd --patch "$(curl -fsSL ${RELEASE}/argocd-server-extension-patch.yaml)"
+# The server container is "argocd-server" (upstream install.yaml) or "server" (Helm chart); detect and match it.
+SERVER_CONTAINER=$(kubectl get deploy argocd-server -n argocd -o jsonpath='{.spec.template.spec.containers[0].name}')
+curl -fsSL ${RELEASE}/argocd-server-extension-patch.yaml | sed "s/- name: argocd-server/- name: ${SERVER_CONTAINER}/" \
+  | kubectl patch deployment argocd-server -n argocd --patch-file /dev/stdin
 ```
 
 Then put a Terraform object in a repository synced by an Argo CD Application:

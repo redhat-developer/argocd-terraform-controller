@@ -136,6 +136,25 @@ Kubernetes backend works from a laptop with `in_cluster_config = false`.
 Instructions in [State › Working with the state from the CLI](state.md#working-with-the-state-from-the-cli).
 Resume afterwards.
 
+### Installing the UI extension fails with `containers[0].image: Required value`
+
+```
+The Deployment "argocd-server" is invalid: spec.template.spec.containers[0].image: Required value
+```
+
+The server-extension patch merges into the server container by name
+(`- name: argocd-server`). The upstream `install.yaml` names it `argocd-server`,
+but the Argo CD **Helm chart** names it `server`. When the name does not match,
+strategic merge appends a new container that has only the volume mount and no
+image, and the API rejects it. Detect the real name and rewrite the patch:
+
+```sh
+SERVER_CONTAINER=$(kubectl get deploy argocd-server -n argocd -o jsonpath='{.spec.template.spec.containers[0].name}')
+curl -fsSL ${RELEASE}/argocd-server-extension-patch.yaml \
+  | sed "s/- name: argocd-server/- name: ${SERVER_CONTAINER}/" \
+  | kubectl patch deployment argocd-server -n argocd --patch-file /dev/stdin
+```
+
 ### Nothing in the Argo CD UI
 
 - No **Terraform** entry in the sidebar and no tab: the extension is not

@@ -100,8 +100,13 @@ users are in [Argo CD integration](argocd-integration.md).
 kubectl patch configmap argocd-cm -n argocd --type merge \
   --patch "$(curl -fsSL ${RELEASE}/argocd-cm-patch.yaml)"
 
-kubectl patch deployment argocd-server -n argocd \
-  --patch "$(curl -fsSL ${RELEASE}/argocd-server-extension-patch.yaml)"
+# The server-extension patch mounts the extension into the argocd-server
+# container. Its name depends on the install method (upstream install.yaml:
+# "argocd-server"; Helm chart: "server"), so detect it and rewrite the patch.
+SERVER_CONTAINER=$(kubectl get deploy argocd-server -n argocd -o jsonpath='{.spec.template.spec.containers[0].name}')
+curl -fsSL ${RELEASE}/argocd-server-extension-patch.yaml \
+  | sed "s/- name: argocd-server/- name: ${SERVER_CONTAINER}/" > /tmp/argocd-terraform-server-patch.yaml
+kubectl patch deployment argocd-server -n argocd --patch-file /tmp/argocd-terraform-server-patch.yaml
 kubectl -n argocd rollout status deploy/argocd-server
 
 # Optional: let the controller reuse Argo CD repository credentials
@@ -115,6 +120,14 @@ Verify the extension landed, then hard-refresh the browser (Argo CD caches
 kubectl -n argocd exec deploy/argocd-server -- ls /tmp/extensions/resources/
 # extension-terraform.js
 ```
+
+> [!NOTE]
+> The server-extension patch merges into the server container by name. The
+> upstream `install.yaml` names it `argocd-server`; the Argo CD **Helm chart**
+> names it `server`. If the name does not match, strategic merge appends a
+> container with no image and the API rejects the patch with
+> `spec.template.spec.containers[0].image: Required value`. The `SERVER_CONTAINER`
+> detection above handles both.
 
 ## Upgrading
 

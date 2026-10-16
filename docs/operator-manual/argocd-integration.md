@@ -21,13 +21,23 @@ Or patch an existing installation:
 
 ```sh
 kubectl patch configmap argocd-cm -n argocd --type merge --patch-file config/argocd/argocd-cm-patch.yaml
-kubectl patch deployment argocd-server -n argocd --patch-file config/argocd/argocd-server-extension-patch.yaml
+# The argocd-server container is named "argocd-server" (upstream install.yaml)
+# or "server" (Helm chart); detect it so the strategic merge matches.
+SERVER_CONTAINER=$(kubectl get deploy argocd-server -n argocd -o jsonpath='{.spec.template.spec.containers[0].name}')
+sed "s/- name: argocd-server/- name: ${SERVER_CONTAINER}/" config/argocd/argocd-server-extension-patch.yaml \
+  | kubectl patch deployment argocd-server -n argocd --patch-file /dev/stdin
 kubectl apply -n argocd -f config/argocd/argocd_repo_reader_binding.yaml
 ```
 
-With the Argo CD Helm chart, copy the two `resource.customizations.*` keys of
-`argocd-cm-patch.yaml` into `configs.cm` and the init container / volume of the
-server patch into `server.initContainers`, `server.volumeMounts`, `server.volumes`.
+If the container name does not match, strategic merge appends a container with
+no image and the API rejects the patch with
+`spec.template.spec.containers[0].image: Required value`.
+
+With the Argo CD Helm chart, the native way is to copy the two
+`resource.customizations.*` keys of `argocd-cm-patch.yaml` into `configs.cm`
+and the init container / volume of the server patch into `server.initContainers`,
+`server.volumeMounts`, `server.volumes` (the chart already names the container
+`server`, so no rename is needed there).
 
 ## Health assessment
 

@@ -80,9 +80,14 @@ Three configuration-only changes to a stock Argo CD (details in
 kubectl patch configmap argocd-cm -n argocd --type merge \
   --patch "$(curl -fsSL https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/argocd-cm-patch.yaml)"
 
-# UI extension, installed by an init container on argocd-server
-kubectl patch deployment argocd-server -n argocd \
-  --patch "$(curl -fsSL https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/argocd-server-extension-patch.yaml)"
+# UI extension, installed by an init container on argocd-server. The patch
+# mounts the extension into the server container, whose name differs by
+# install method (upstream install.yaml: "argocd-server"; Helm chart: "server"),
+# so detect it and rewrite the patch to match.
+SERVER_CONTAINER=$(kubectl get deploy argocd-server -n argocd -o jsonpath='{.spec.template.spec.containers[0].name}')
+curl -fsSL https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/argocd-server-extension-patch.yaml \
+  | sed "s/- name: argocd-server/- name: ${SERVER_CONTAINER}/" > /tmp/argocd-terraform-server-patch.yaml
+kubectl patch deployment argocd-server -n argocd --patch-file /tmp/argocd-terraform-server-patch.yaml
 kubectl -n argocd rollout status deploy/argocd-server
 
 # Optional: let the controller reuse Argo CD repository credentials
