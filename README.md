@@ -119,7 +119,7 @@ lists every object and graphs the resources it manages.
 - [State backends, backup and restore](docs/state.md)
 - [Terraform vs OpenTofu](docs/binaries.md)
 - [Sources and credentials](docs/sources.md)
-- [API reference](docs/api.md)
+- [API reference](docs/api.md) — the generated CRD schema is also browsable at [doc.crds.dev](https://doc.crds.dev/github.com/redhat-developer/argocd-terraform-controller)
 - [Development](docs/development.md)
 
 ## Status

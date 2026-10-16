@@ -181,6 +181,55 @@ kubectl delete clusterrolebinding tf-runner-${TF_NAMESPACE}-sample
 kubectl delete -f https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/install.yaml
 ```
 
+## Using cloud credentials
+
+The sample above only needs Kubernetes access, so the runner's ServiceAccount
+is enough. Real stacks need provider credentials. Two common ways, both
+without touching the Terraform code; the runner Pod is where Terraform runs,
+so that is where credentials must end up.
+
+**Static credentials file** — mount an existing `~/.aws/credentials` into the
+runner home with `spec.fileMappings`. The provider keeps using
+`profile = "<name>"` exactly as on your laptop:
+
+```sh
+kubectl -n ${TF_NAMESPACE} create secret generic aws-credentials \
+  --from-file=credentials=$HOME/.aws/credentials
+```
+
+```yaml
+spec:
+  fileMappings:
+    - secretRef:
+        name: aws-credentials
+        key: credentials
+      location: home               # /home/runner
+      path: .aws/credentials       # → /home/runner/.aws/credentials
+```
+
+**Workload identity (EKS)** — no secret at all: map the runner ServiceAccount
+(`tf-runner` in the object's namespace, or `spec.runner.serviceAccountName`)
+to an IAM role, either with IRSA
+(`kubectl -n ${TF_NAMESPACE} annotate sa tf-runner eks.amazonaws.com/role-arn=<arn>`)
+or EKS Pod Identity
+(`aws eks create-pod-identity-association --namespace ${TF_NAMESPACE} --service-account tf-runner --role-arn <arn> …`).
+Leave `profile` unset in the provider and let the runner read the projected
+token:
+
+```yaml
+spec:
+  runner:
+    podTemplate:
+      spec:
+        securityContext:
+          fsGroup: 65532           # runner is non-root; makes the token readable
+```
+
+Other providers work the same way: env vars via
+`spec.runner.podTemplate.spec.env`/`envFrom`, files via `spec.fileMappings`,
+or the equivalent workload identity (GKE Workload Identity, Azure Workload
+Identity) on the runner ServiceAccount.
+
 ## What happens on each reconciliation
 
 1. The source is resolved (`git ls-remote` / registry HEAD) and fetched when
