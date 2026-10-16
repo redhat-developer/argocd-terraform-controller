@@ -71,7 +71,10 @@ metrics:
     additionalLabels: {}
 
 imagePullSecrets: []
-nameOverride: ""
+# The chart is named argocd-terraform-controller-helmchart so it can live in
+# its own OCI repository next to the -manager and -runner images. This keeps
+# every rendered resource named argocd-terraform-controller regardless.
+nameOverride: argocd-terraform-controller
 fullnameOverride: ""
 podSecurityContext:
   runAsNonRoot: true

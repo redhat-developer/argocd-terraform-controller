@@ -1,5 +1,5 @@
 apiVersion: v2
-name: argocd-terraform-controller
+name: argocd-terraform-controller-helmchart
 description: Runs Terraform / OpenTofu from Argo CD with plan approval, drift detection and a UI extension
 type: application
 version: 0.1.0

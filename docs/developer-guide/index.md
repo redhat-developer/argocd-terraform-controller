@@ -69,9 +69,17 @@ health logic in `ui/extension/src/model.ts`; keep them in sync.
 Bump `export VERSION=vX.Y.Z` in `docs/getting-started.md` so the guide stays
 copy-pasteable (`make verify-release-version TAG=vX.Y.Z` checks it; the Release
 workflow fails early if it does not match the tag), then tag `vX.Y.Z`. CI
-pushes the `quay.io/redhatworkshops/argocd-terraform-controller-{manager,runner}` images, builds the
-UI extension tarball, the install manifest, the Argo CD patches and the Helm
-chart, and attaches them to the GitHub release.
+pushes the `quay.io/redhatworkshops/argocd-terraform-controller-{manager,runner}`
+images, publishes the Helm chart to
+`oci://quay.io/redhatworkshops/argocd-terraform-controller-helmchart` (tag
+`X.Y.Z`), builds the UI extension tarball, the install manifest, the Argo CD
+patches and the chart tarball, and attaches them to the GitHub release.
+
+The chart is named `argocd-terraform-controller-helmchart` so Helm's OCI push
+lands it in its own Quay repository; `nameOverride` in `values.yaml` keeps the
+rendered resources named `argocd-terraform-controller`. The Quay robot
+(`QUAY_USERNAME` / `QUAY_PASSWORD`) needs write access to that repository, as
+it does for the image repositories.
 
 ## Documentation site
 

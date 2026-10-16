@@ -52,6 +52,21 @@ jobs:
           make helm-sync-crds
           helm package charts/argocd-terraform-controller --version "${TAG#v}" --app-version "${TAG#v}" --destination dist
 
+      # QUAY_USERNAME / QUAY_PASSWORD: the same Quay robot used for the images,
+      # with write access to the argocd-terraform-controller-helmchart repo.
+      - name: Publish the Helm chart to Quay (OCI)
+        env:
+          TAG: ${{ github.ref_name }}
+          QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+          QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
+        run: |
+          helm registry login quay.io --username "${QUAY_USERNAME}" --password "${QUAY_PASSWORD}"
+          # The chart is named argocd-terraform-controller-helmchart, so helm push
+          # publishes it to quay.io/redhatworkshops/argocd-terraform-controller-helmchart
+          # with the chart version (TAG without the leading v) as the OCI tag.
+          helm push "dist/argocd-terraform-controller-helmchart-${TAG#v}.tgz" oci://quay.io/redhatworkshops
+          helm registry logout quay.io
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:

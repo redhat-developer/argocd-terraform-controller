@@ -22,11 +22,11 @@ variables you may want to change later: `RUNNER_POD_IMAGE` (the runner image,
 which contains `terraform` and `tofu`) and `ARGOCD_NAMESPACE` (defaults to
 `argocd`, used to reuse Argo CD repository credentials).
 
-Alternatively, with Helm:
+Alternatively, with Helm from the OCI chart:
 
 ```sh
 helm install argocd-terraform-controller \
-  https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/argocd-terraform-controller-${VERSION#v}.tgz \
+  oci://quay.io/redhatworkshops/argocd-terraform-controller-helmchart --version ${VERSION#v} \
   --namespace argocd-terraform-controller-system --create-namespace \
   --set runner.namespaces="{${TF_NAMESPACE}}"
 ```

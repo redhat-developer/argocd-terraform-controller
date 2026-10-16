@@ -12,7 +12,7 @@ export RELEASE=https://github.com/redhat-developer/argocd-terraform-controller/r
 | Asset | What it installs | Lives in |
 |---|---|---|
 | `install.yaml` | `Terraform` CRD, controller RBAC, the controller Deployment (manager and runner images pinned to the release) | namespace `argocd-terraform-controller-system` |
-| `argocd-terraform-controller-<ver>.tgz` | Helm chart equivalent of `install.yaml`, plus the runner identity for `runner.namespaces` | wherever you install it |
+| `argocd-terraform-controller-helmchart-<ver>.tgz` | Helm chart equivalent of `install.yaml`, plus the runner identity for `runner.namespaces`. Also published as an OCI chart at `oci://quay.io/redhatworkshops/argocd-terraform-controller-helmchart` (tag `<ver>`) | wherever you install it |
 | `argocd-cm-patch.yaml` | Health assessment and resource actions (Lua) for `infra.argocd.io/Terraform` | ConfigMap `argocd-cm` |
 | `argocd-server-extension-patch.yaml` | Init container that downloads the UI extension into `argocd-server` | Deployment `argocd-server` |
 | `argocd-terraform-extension.tar.gz`, `checksums.txt` | The UI extension bundle; fetched by the init container above, not applied by hand | — |
@@ -33,12 +33,28 @@ credentials).
 
 ### Helm
 
+From the OCI chart in Quay (recommended):
+
 ```sh
 helm install argocd-terraform-controller \
-  ${RELEASE}/argocd-terraform-controller-${VERSION#v}.tgz \
+  oci://quay.io/redhatworkshops/argocd-terraform-controller-helmchart --version ${VERSION#v} \
   --namespace argocd-terraform-controller-system --create-namespace \
   --set runner.namespaces="{team-a,team-b}"
 ```
+
+Or from the chart tarball attached to the release (handy for air-gapped
+clusters — mirror it first):
+
+```sh
+helm install argocd-terraform-controller \
+  ${RELEASE}/argocd-terraform-controller-helmchart-${VERSION#v}.tgz \
+  --namespace argocd-terraform-controller-system --create-namespace \
+  --set runner.namespaces="{team-a,team-b}"
+```
+
+The chart is named `argocd-terraform-controller-helmchart` (so it has its own
+OCI repository next to the `-manager` and `-runner` images), but it still
+deploys resources named `argocd-terraform-controller`.
 
 `runner.namespaces` creates the runner identity (next step) in each listed
 namespace. Other useful values: `controller.concurrent`, `argocd.namespace`,
@@ -108,7 +124,7 @@ assets with the new `VERSION`:
 
 | Changed in the release | Run |
 |---|---|
-| Controller, CRD, RBAC, runner (Go code, API types) | `kubectl apply -f ${RELEASE}/install.yaml` (or `helm upgrade … <new chart>`). Rolling update; Terraform objects and state are untouched. |
+| Controller, CRD, RBAC, runner (Go code, API types) | `kubectl apply -f ${RELEASE}/install.yaml` (or `helm upgrade argocd-terraform-controller oci://quay.io/redhatworkshops/argocd-terraform-controller-helmchart --version ${VERSION#v} --reuse-values`). Rolling update; Terraform objects and state are untouched. |
 | Health or actions (`config/argocd/lua`) | The `argocd-cm` patch above. Argo CD reloads it live — no restart. |
 | UI extension (`ui/extension`) | The `argocd-server` patch above. Re-applying it re-pins the download URL to the new release **and** triggers a rollout; a plain `rollout restart` would re-download the *old* bundle. Hard-refresh the browser afterwards. |
 
