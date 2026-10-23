@@ -28,6 +28,10 @@ jobs:
         with:
           persist-credentials: false
 
+      # Cheap and first: a stray binary in the tree breaks every runner upload.
+      - name: Verify the committed tree stays small enough for the runner
+        run: make verify-tree-size
+
       - name: Setup Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:

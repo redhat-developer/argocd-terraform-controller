@@ -44,3 +44,9 @@ dist/
 # Documentation site build output and pip cache (make build-docs / serve-docs)
 site/
 .docs-pip-cache/
+
+# Binaries that `go build ./cmd/<name>` drops at the repository root. Use
+# `make build` (outputs to bin/) instead. A stray binary committed here once
+# inflated the tree past the runner's 4 MiB source limit and broke e2e.
+/manager
+/runner

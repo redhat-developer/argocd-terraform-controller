@@ -21,10 +21,12 @@ package e2e
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -476,6 +478,9 @@ spec:
 	if err != nil {
 		return err
 	}
+	if err := checkSourceSize(projectDir); err != nil {
+		return err
+	}
 	tmp, err := os.MkdirTemp("", "e2e-repo-*")
 	if err != nil {
 		return err
@@ -498,6 +503,57 @@ spec:
 	}
 	_, err = utils.Run(exec.Command("kubectl", "cp", bare, ns+"/git-server:/repos/repo.git"))
 	return err
+}
+
+// maxSourceBytes mirrors the controller's default --runner-grpc-max-message-size
+// (4 MiB): the committed tree is archived and sent to the runner in one gRPC
+// message. A larger tree makes every run fail with ResourceExhausted and the
+// "becoming Ready" wait time out, so fail fast with the culprits instead.
+const maxSourceBytes = 4 * 1024 * 1024
+
+// checkSourceSize fails when the committed tree at HEAD is too large to ship
+// to the runner, listing the biggest blobs so a stray build output or vendored
+// artifact is obvious.
+func checkSourceSize(projectDir string) error {
+	out, err := utils.Run(exec.Command("git", "-C", projectDir, "ls-tree", "-r", "-l", "HEAD"))
+	if err != nil {
+		return fmt.Errorf("unable to list the committed tree: %w", err)
+	}
+	type blob struct {
+		size int64
+		path string
+	}
+	var blobs []blob
+	var total int64
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		// <mode> <type> <object> <size>\t<path>
+		meta, path, ok := strings.Cut(line, "\t")
+		if !ok {
+			continue
+		}
+		fields := strings.Fields(meta)
+		if len(fields) < 4 || fields[1] != "blob" {
+			continue
+		}
+		var size int64
+		if _, err := fmt.Sscan(fields[3], &size); err != nil {
+			continue
+		}
+		total += size
+		blobs = append(blobs, blob{size, path})
+	}
+	// Leave headroom for tar overhead; the real limit applies to the archive.
+	if total <= maxSourceBytes*3/4 {
+		return nil
+	}
+	sort.Slice(blobs, func(i, j int) bool { return blobs[i].size > blobs[j].size })
+	var b strings.Builder
+	fmt.Fprintf(&b, "committed tree is %.1f MiB, over the %d MiB the runner accepts in one gRPC message; largest files:\n", float64(total)/1048576, maxSourceBytes/1048576)
+	for i := 0; i < len(blobs) && i < 5; i++ {
+		fmt.Fprintf(&b, "  %8.1f KiB  %s\n", float64(blobs[i].size)/1024, blobs[i].path)
+	}
+	b.WriteString("remove the offending files from git (build outputs belong in bin/) or set source.git.ignore")
+	return errors.New(b.String())
 }
 
 func sourcePath() string {

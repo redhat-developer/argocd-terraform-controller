@@ -25,7 +25,7 @@ test/e2e               kind end-to-end tests
 make generate manifests     # deepcopy, CRD, RBAC, gRPC code, argocd-cm patch
 make test                   # unit + envtest (needs terraform or tofu in PATH)
 make lint                   # golangci-lint
-make build                  # bin/manager, bin/runner
+make build                  # bin/manager, bin/runner (never `go build ./cmd/...` at the root: a stray binary there breaks the runner's 4 MiB source limit; CI runs make verify-tree-size)
 make docker-build docker-build-runner
 make test-e2e               # kind: builds images, deploys, applies with tofu and terraform
 make ui-test ui-build build-extension   # UI, in a node:22 container

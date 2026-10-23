@@ -89,6 +89,21 @@ helm-lint: helm-sync ## Lint and render the Helm chart.
 verify-argocd-overlay: kustomize ## Build the Argo CD component against the upstream install manifests.
 	"$(KUSTOMIZE)" build hack/argocd-overlay-test > /dev/null
 
+# The runner receives the whole source tree in one gRPC message, capped by
+# --runner-grpc-max-message-size (4 MiB). Keep the committed tree well under
+# that so the examples (and e2e, which serves this checkout) keep working.
+MAX_TREE_KIB ?= 3072
+.PHONY: verify-tree-size
+verify-tree-size: ## Fail when the committed tree exceeds MAX_TREE_KIB (stray binaries, vendored blobs).
+	@total=$$(git ls-tree -r -l HEAD | awk '{s+=$$4} END {print int(s/1024)}'); \
+	if [ "$$total" -gt "$(MAX_TREE_KIB)" ]; then \
+		echo "committed tree is $${total} KiB, limit is $(MAX_TREE_KIB) KiB. Largest files:"; \
+		git ls-tree -r -l HEAD | sort -k4 -n -r | head -5 | awk '{printf "  %8d KiB  %s\n", $$4/1024, $$5}'; \
+		echo "Remove build outputs from git (use make build -> bin/) or add them to .gitignore."; \
+		exit 1; \
+	fi; \
+	echo "committed tree is $${total} KiB (limit $(MAX_TREE_KIB) KiB)"
+
 .PHONY: verify-release-version
 verify-release-version: ## Check docs/getting-started.md pins the release being tagged (TAG=vX.Y.Z).
 	@test -n "$(TAG)" || { echo "TAG is required, e.g. make verify-release-version TAG=v0.1.0"; exit 1; }
