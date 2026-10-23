@@ -136,6 +136,54 @@ Kubernetes backend works from a laptop with `in_cluster_config = false`.
 Instructions in [State › Working with the state from the CLI](state.md#working-with-the-state-from-the-cli).
 Resume afterwards.
 
+### The object flaps between Degraded and Progressing, re-planning the same resource
+
+Symptom: `Ready=False / DriftDetected` on every interval, the drift event
+always lists the **same resource** to be created (or changed), applying it
+succeeds, and the next check finds the same drift again.
+
+The configuration writes something to the **runner's filesystem**. Every run
+executes in a fresh Pod whose working directory and home are `emptyDir`
+volumes that vanish when the Pod is deleted, so any resource whose "real
+world" is a local file — `local_file`, `local_sensitive_file`, a `null_resource`
+with a `local-exec` that writes a file, a `tls_private_key` saved with
+`local_file` — ceases to exist the moment the run ends. Terraform then sees a
+resource in state that is missing from the world, and reports drift forever.
+
+Example of the pattern (an SSH key pair written next to the configuration):
+
+```hcl
+resource "tls_private_key" "ssh" { algorithm = "ED25519" }
+
+resource "local_sensitive_file" "private_key" {        # drifts on every run
+  filename = "${path.root}/${var.name}-key.pem"
+  content  = tls_private_key.ssh.private_key_openssh
+}
+```
+
+Fix: keep the value in Terraform's state and **hand it out as an output**
+instead of a file. Outputs land in the Secret named by
+`spec.writeOutputsToSecret`, which is where secrets belong on Kubernetes:
+
+```hcl
+output "private_key" {
+  value     = tls_private_key.ssh.private_key_openssh
+  sensitive = true
+}
+```
+
+```sh
+kubectl -n team-a get secret <outputs-secret> -o jsonpath='{.data.private_key}' | base64 -d > key.pem
+```
+
+The same applies to anything a laptop workflow leaves on disk: generated
+kubeconfigs, certificates, rendered templates, downloaded archives. If a file
+is genuinely needed by a later resource in the same run, that still works —
+the file exists for the duration of the run — just do not make it a managed
+resource that must survive between runs. See
+[Drift detection](../user-guide/drift-detection.md#drift-that-never-goes-away)
+and [Outputs](../user-guide/outputs.md).
+
 ### Installing the UI extension fails with `containers[0].image: Required value`
 
 ```

@@ -6,6 +6,16 @@ and are packaged as a Kustomize **Component**.
 
 ## Install
 
+**With the Helm chart** (default) nothing needs doing: a post-install hook
+merges the health/actions Lua into `argocd-cm` and adds the UI extension init
+container to `argocd-server`, detecting the server container name; a
+pre-delete hook reverts both. Every step is a value under
+`argocd.integration.*` — see
+[Installation › Helm](installation.md#helm-recommended).
+
+Without the chart, or with `argocd.integration.enabled=false`, pick one of the
+following.
+
 As a component of your Argo CD kustomization:
 
 ```yaml

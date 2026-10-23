@@ -22,7 +22,7 @@ What happens next depends on `spec.approvePlan`:
 | Mode | On drift |
 |---|---|
 | `auto` (or `spec.force`) | The run continues: a normal plan is produced and **applied immediately**. The object goes Degraded → Progressing → Healthy within one reconcile. `status.lastAppliedByDriftDetectionAt` records it |
-| manual (`""` or a plan ID) | The run **stops** and reports Degraded. Review the drift in the event or the UI, then trigger **Re-plan**; the resulting plan waits for approval like any other change |
+| manual (`""` or a plan ID) | The run **stops** and reports Degraded, then re-checks on the next `interval`. Drift is a finding, not a failure: `status.reconciliationFailures` is not incremented and `remediation.retries` is unaffected. Review the drift in the event or the UI, then trigger **Re-plan**: the controller produces a real plan for the remediation, which waits for approval like any other change — unless `spec.approvePlan` still holds this revision's plan ID, in which case it matches and is applied in the same run (see below) |
 | `disable` | Detection only — plans are run but never stored or applied. The object alternates between `NoDrift` and `DriftDetected`; use it for auditing stacks that are applied elsewhere |
 
 Drift detection is skipped when `spec.disableDriftDetection: true`, when
@@ -42,9 +42,48 @@ so pick it per stack:
 | Application infrastructure | `1h` |
 | Expensive-to-refresh stacks (hundreds of resources, rate-limited APIs) | `6h`–`24h`, or `disableDriftDetection` plus an occasional manual re-plan |
 
-When drift detection fails repeatedly (expired credentials are the usual
-cause), `spec.retryInterval` and `spec.retryStrategy` govern the retries like
-for any other failure.
+When drift detection *fails* (expired credentials are the usual cause,
+`DriftDetectionFailed`), `spec.retryInterval` and `spec.retryStrategy` govern
+the retries like for any other failure. *Detected* drift, by contrast, is
+re-checked on `spec.interval` only: checking sooner cannot change the outcome
+until someone acts on it, and each check costs a runner Pod and provider
+API calls.
+
+## Remediating in manual mode
+
+After `DriftDetected`, press **Re-plan** in the Argo CD UI (or set the
+`infra.argocd.io/reconcile` annotation). Instead of detecting the same drift
+again, the controller now plans: the resulting plan is the remediation and is
+stored as `status.plan.pending`.
+
+- If `spec.approvePlan` is empty or holds a different ID, the object becomes
+  **Suspended** with the plan ID in its message. Review and approve it as
+  usual.
+- If `spec.approvePlan` still holds the plan ID of the **current revision** —
+  the normal situation after approving once from Git — the remediation plan
+  gets the same ID (plan IDs are derived from the revision), matches, and is
+  applied in the same run. Re-plan is then a one-click remediation. To review
+  the remediation first, clear `spec.approvePlan` before pressing Re-plan.
+
+Any change to the source or to the object spec also produces a fresh plan
+that includes the accumulated drift, so committing a fix remediates drift as
+a side effect.
+
+## Drift that never goes away
+
+If the drift event lists the **same resource** every time and applying it
+does not make the drift stop, the resource's "real world" is the runner Pod
+itself. Each run executes in a fresh Pod whose working directory and home are
+`emptyDir` volumes, so resources that *are* local files — `local_file`,
+`local_sensitive_file`, files written by `local-exec` — disappear when the
+run ends and are reported missing on the next check, forever.
+
+Keep such values in state and expose them as **outputs** (which land in the
+`spec.writeOutputsToSecret` Secret) instead of writing them to disk; a
+`tls_private_key` saved with `local_sensitive_file` is the classic case. Files
+only needed *during* a run are fine. See
+[Troubleshooting](../operator-manual/troubleshooting.md#the-object-flaps-between-degraded-and-progressing-re-planning-the-same-resource)
+for a worked example and [Outputs](outputs.md).
 
 ## Outputs drift
 

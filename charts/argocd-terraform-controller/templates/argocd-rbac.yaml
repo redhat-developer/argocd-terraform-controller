@@ -1,4 +1,4 @@
-{{- if .Values.argocd.repoCredentials.enabled }}
+{{- if and .Values.argocd.repoCredentials.enabled (include "atc.argocd.ready" .) }}
 # Lets the controller read Argo CD repository credential Secrets and the SSH
 # known hosts ConfigMap for spec.source.git.useArgoCDRepoCredentials.
 apiVersion: rbac.authorization.k8s.io/v1

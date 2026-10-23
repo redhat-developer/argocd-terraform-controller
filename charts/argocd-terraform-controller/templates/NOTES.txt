@@ -1,10 +1,37 @@
-{{ .Chart.Name }} {{ .Chart.Version }} installed in namespace {{ .Release.Namespace }}.
+{{ .Chart.Name }} {{ .Chart.Version }} (app {{ .Chart.AppVersion }}) installed in namespace {{ .Release.Namespace }}.
 
-Runner ServiceAccounts (tf-runner) were created in: {{ include "atc.runnerNamespaces" . }}
-Add namespaces that host Terraform objects to runner.namespaces.
+Runner identity (ServiceAccount tf-runner + RoleBinding) created in: {{ include "atc.runnerNamespaces" . }}
+{{- if not .Values.runner.namespaces }}
 
-Argo CD integration (health, actions, UI extension) is configuration only:
-  https://github.com/redhat-developer/argocd-terraform-controller/tree/main/config/argocd
+  NOTE: runner.namespaces is empty. Terraform objects can only run in the
+  namespaces listed there (the release namespace is always included):
+    helm upgrade {{ .Release.Name }} ... --set runner.namespaces="{team-a,team-b}"
+{{- end }}
 
-Create your first Terraform object:
-  kubectl apply -f https://raw.githubusercontent.com/redhat-developer/argocd-terraform-controller/main/config/samples/infra_v1alpha1_terraform.yaml
+{{- if include "atc.argocd.enabled" . }}
+{{- if include "atc.argocd.ready" . }}
+
+Argo CD integration (namespace {{ .Values.argocd.namespace }}) was applied by a Helm hook:
+{{- if .Values.argocd.integration.customizations.enabled }}
+  - health assessment and resource actions merged into ConfigMap {{ .Values.argocd.integration.customizations.configMapName }}
+{{- end }}
+{{- if .Values.argocd.integration.uiExtension.enabled }}
+  - UI extension {{ include "atc.argocd.extensionVersion" . }} installed into Deployment {{ .Values.argocd.integration.uiExtension.deploymentName }}
+    (hard-refresh the Argo CD UI once argocd-server has rolled out)
+{{- end }}
+  Undo on uninstall: {{ .Values.argocd.integration.cleanupOnUninstall }}
+{{- else }}
+
+  WARNING: Argo CD namespace {{ .Values.argocd.namespace | quote }} was not found, so the
+  Argo CD integration (health, actions, UI extension) was skipped. Once Argo CD
+  is installed, run `helm upgrade` again or set argocd.namespace.
+{{- end }}
+{{- else }}
+
+Argo CD integration is disabled (argocd.integration.enabled=false). Apply the
+customizations yourself:
+  https://redhat-developer.github.io/argocd-terraform-controller/operator-manual/argocd-integration/
+{{- end }}
+
+Documentation: https://redhat-developer.github.io/argocd-terraform-controller/
+Getting started: https://redhat-developer.github.io/argocd-terraform-controller/getting-started/

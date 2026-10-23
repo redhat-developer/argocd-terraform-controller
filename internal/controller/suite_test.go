@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -286,3 +287,21 @@ func deleteAndWait(tf *infrav1.Terraform) {
 func jsonValue(raw string) *apiextensionsv1.JSON { return &apiextensionsv1.JSON{Raw: []byte(raw)} }
 
 func readFile(path string) ([]byte, error) { return os.ReadFile(path) }
+
+// emptyState rewrites a local state file to contain no resources while
+// keeping lineage and bumping the serial, simulating infrastructure that was
+// removed behind Terraform's back.
+func emptyState(path string) {
+	data, err := os.ReadFile(path)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	var state map[string]any
+	ExpectWithOffset(1, json.Unmarshal(data, &state)).To(Succeed())
+	state["resources"] = []any{}
+	state["outputs"] = map[string]any{}
+	if serial, ok := state["serial"].(float64); ok {
+		state["serial"] = serial + 1
+	}
+	out, err := json.MarshalIndent(state, "", "  ")
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, os.WriteFile(path, out, 0o600)).To(Succeed())
+}

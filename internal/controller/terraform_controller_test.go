@@ -19,6 +19,7 @@ package controller
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -217,6 +218,89 @@ output "message" { value = "${var.greeting}, ${var.who}" }
 		data, err := readFile(statePath)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(data)).NotTo(ContainSubstring(`"type": "terraform_data"`))
+	})
+
+	It("treats drift as a state in manual mode and plans the remediation on request", func() {
+		repo := newTestRepo(map[string]string{"main.tf": helloTF})
+		tf := newTerraform("manual-drift", repo, nil)
+		Expect(k8sClient.Create(ctx, tf)).To(Succeed())
+		key := client.ObjectKeyFromObject(tf)
+		DeferCleanup(func() { deleteAndWait(getTF(key)) })
+		statePath := strings.TrimSuffix(strings.TrimPrefix(tf.Spec.BackendConfig.CustomConfiguration, "backend \"local\" {\n    path = \""), "\"\n  }")
+		driftReason := func() string {
+			if c := readyCondition(key)(); c != nil {
+				return c.Reason
+			}
+			return ""
+		}
+
+		By("approving and applying the first plan")
+		Eventually(func() string { return getTF(key).Status.Plan.Pending }, timeout, interval).Should(HavePrefix("plan-main-"))
+		got := getTF(key)
+		planID := got.Status.Plan.Pending
+		got.Spec.ApprovePlan = planID
+		Expect(k8sClient.Update(ctx, got)).To(Succeed())
+		Eventually(readyStatus(key), timeout, interval).Should(Equal(metav1.ConditionTrue))
+		Expect(statePath).To(BeAnExistingFile())
+
+		By("withdrawing the standing approval so later plans wait")
+		got = getTF(key)
+		got.Spec.ApprovePlan = ""
+		Expect(k8sClient.Update(ctx, got)).To(Succeed())
+		Eventually(func() int64 { return getTF(key).Status.ObservedGeneration }, timeout, interval).Should(Equal(getTF(key).Generation))
+		Eventually(readyStatus(key), timeout, interval).Should(Equal(metav1.ConditionTrue), "a no-change plan keeps the object Ready")
+
+		By("inducing drift: the resource disappears from the state behind Terraform's back")
+		emptyState(statePath)
+
+		By("reporting drift without counting it as a failure or leaving a pending plan")
+		Eventually(driftReason, timeout, interval).Should(Equal(infrav1.DriftDetectedReason))
+		got = getTF(key)
+		Expect(got.Status.ReconciliationFailures).To(BeZero(), "drift is a finding, not a failure")
+		Expect(got.Status.LastDriftDetectedAt).NotTo(BeNil())
+		Expect(got.Status.Plan.Pending).To(BeEmpty())
+		Expect(readyCondition(key)().Message).To(ContainSubstring("terraform_data.hello"))
+
+		By("not re-checking on the retry interval")
+		// retryInterval is 2s and interval is 10s: several retry intervals
+		// must pass without another detection run.
+		firstDrift := got.Status.LastDriftDetectedAt.Time
+		Consistently(func() time.Time { return getTF(key).Status.LastDriftDetectedAt.Time }, "6s", interval).Should(Equal(firstDrift))
+		Expect(getTF(key).Status.ReconciliationFailures).To(BeZero())
+
+		By("planning the remediation, and waiting for approval, when a reconcile is requested")
+		got = getTF(key)
+		got.Annotations = map[string]string{ReconcileRequestAnnotation: "2026-02-02T00:00:00Z"}
+		Expect(k8sClient.Update(ctx, got)).To(Succeed())
+		Eventually(func() string { return getTF(key).Status.Plan.Pending }, timeout, interval).Should(Equal(planID), "same revision, same plan ID")
+		ready := readyCondition(key)()
+		Expect(ready.Status).To(Equal(metav1.ConditionUnknown))
+		Expect(ready.Reason).To(Equal(infrav1.PlannedWithChangesReason))
+		Consistently(func() string { return getTF(key).Status.Plan.Pending }, "3s", interval).Should(Equal(planID), "nothing applied without approval")
+
+		By("applying once approved and restoring the resource")
+		got = getTF(key)
+		got.Spec.ApprovePlan = planID
+		Expect(k8sClient.Update(ctx, got)).To(Succeed())
+		Eventually(readyStatus(key), timeout, interval).Should(Equal(metav1.ConditionTrue))
+		Eventually(func() string { return getTF(key).Status.Plan.Pending }, timeout, interval).Should(BeEmpty())
+		data, err := readFile(statePath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(data)).To(ContainSubstring(`"type": "terraform_data"`), "remediation recreated the resource")
+
+		By("remediating in one step when the current revision is still approved")
+		// spec.approvePlan still holds this revision's plan ID, so the
+		// remediation plan matches it and is applied in the same run.
+		emptyState(statePath)
+		Eventually(driftReason, timeout, interval).Should(Equal(infrav1.DriftDetectedReason))
+		got = getTF(key)
+		got.Annotations = map[string]string{ReconcileRequestAnnotation: "2026-03-03T00:00:00Z"}
+		Expect(k8sClient.Update(ctx, got)).To(Succeed())
+		Eventually(readyStatus(key), timeout, interval).Should(Equal(metav1.ConditionTrue))
+		data, err = readFile(statePath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(data)).To(ContainSubstring(`"type": "terraform_data"`))
+		Expect(getTF(key).Status.ReconciliationFailures).To(BeZero())
 	})
 
 	It("respects suspend and planOnly", func() {

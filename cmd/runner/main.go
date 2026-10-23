@@ -26,6 +26,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/go-logr/logr"
 	"go.uber.org/zap/zapcore"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -70,6 +71,7 @@ func main() {
 	}()
 
 	log.Info("starting runner", "version", Version, "commit", Commit, "port", grpcPort, "tls", tlsSecretName != "")
+	ensurePluginCacheDir(log)
 	err := runner.Serve(ctx, runner.ServeOptions{
 		Addr:          fmt.Sprintf(":%d", grpcPort),
 		Namespace:     os.Getenv("POD_NAMESPACE"),
@@ -81,4 +83,20 @@ func main() {
 		log.Error(err, "runner exited with error")
 		os.Exit(1)
 	}
+}
+
+// ensurePluginCacheDir creates TF_PLUGIN_CACHE_DIR when it is set. The image
+// creates it at build time, but the runner Pod mounts an emptyDir over /tmp
+// that shadows it; Terraform warns and disables the cache when the directory
+// does not exist.
+func ensurePluginCacheDir(log logr.Logger) {
+	dir := os.Getenv("TF_PLUGIN_CACHE_DIR")
+	if dir == "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		log.Error(err, "unable to create plugin cache directory, provider caching disabled", "dir", dir)
+		return
+	}
+	log.Info("plugin cache directory ready", "dir", dir)
 }

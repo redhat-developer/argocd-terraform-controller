@@ -29,7 +29,7 @@ make build                  # bin/manager, bin/runner
 make docker-build docker-build-runner
 make test-e2e               # kind: builds images, deploys, applies with tofu and terraform
 make ui-test ui-build build-extension   # UI, in a node:22 container
-make helm-lint verify-argocd-overlay
+make helm-sync helm-lint verify-argocd-overlay   # helm-sync copies CRDs + the argocd-cm Lua patch into the chart
 make build-docs serve-docs   # documentation site, in a python:3.12 container
 ```
 

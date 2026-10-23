@@ -63,30 +63,22 @@ flowchart TB
 
 The step-by-step, copy-and-paste version is in [docs/getting-started.md](docs/getting-started.md).
 
-Install the controller (CRD, RBAC, Deployment):
+Install the controller, the runner identity for your namespaces, and the
+Argo CD integration (health, actions, UI extension) with one Helm command.
+The chart checks that Argo CD is present (`argocd` namespace by default;
+`--set argocd.namespace=…` otherwise) and `helm uninstall` reverts the Argo CD
+changes:
 
 ```sh
-kubectl apply -f https://github.com/redhat-developer/argocd-terraform-controller/releases/latest/download/install.yaml
+helm install argocd-terraform-controller \
+  oci://quay.io/redhatworkshops/argocd-terraform-controller-helmchart --version <version> \
+  --namespace argocd-terraform-controller-system --create-namespace \
+  --set runner.namespaces="{my-namespace}" --wait
 ```
 
-Create the runner identity (`tf-runner` ServiceAccount + RoleBinding) in every
-namespace that will host Terraform objects:
-
-```sh
-kustomize build https://github.com/redhat-developer/argocd-terraform-controller/config/runner | kubectl apply -n my-namespace -f -
-```
-
-Integrate with Argo CD (health, actions, UI extension) — see
-[Argo CD integration](docs/operator-manual/argocd-integration.md):
-
-```sh
-RELEASE=https://github.com/redhat-developer/argocd-terraform-controller/releases/latest/download
-kubectl patch configmap argocd-cm -n argocd --type merge --patch "$(curl -fsSL ${RELEASE}/argocd-cm-patch.yaml)"
-# The server container is "argocd-server" (upstream install.yaml) or "server" (Helm chart); detect and match it.
-SERVER_CONTAINER=$(kubectl get deploy argocd-server -n argocd -o jsonpath='{.spec.template.spec.containers[0].name}')
-curl -fsSL ${RELEASE}/argocd-server-extension-patch.yaml | sed "s/- name: argocd-server/- name: ${SERVER_CONTAINER}/" \
-  | kubectl patch deployment argocd-server -n argocd --patch-file /dev/stdin
-```
+Plain-manifest alternatives (`install.yaml`, `argocd-cm-patch.yaml`,
+`argocd-server-extension-patch.yaml`) are attached to every release — see
+[Installation](docs/operator-manual/installation.md).
 
 Then put a Terraform object in a repository synced by an Argo CD Application:
 

@@ -1,0 +1,250 @@
+{{- if and (include "atc.argocd.enabled" .) (include "atc.argocd.ready" .) }}
+{{- $ns := .Values.argocd.namespace }}
+{{- $i := .Values.argocd.integration }}
+{{- $hook := include "atc.argocd.hookName" . }}
+# Argo CD integration. argocd-cm and the argocd-server Deployment belong to the
+# Argo CD installation, so this chart cannot render them; instead a hook Job
+# patches them after install/upgrade (and un-patches them before delete).
+# The hook identity (ordinary release resources, so they exist for both the
+# post-install and the pre-delete hook) is scoped to the Argo CD namespace and
+# to the two named objects.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $hook }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "atc.argocd.hookLabels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $hook }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "atc.argocd.hookLabels" . | nindent 4 }}
+rules:
+{{- if $i.customizations.enabled }}
+- apiGroups: [""]
+  resources: [configmaps]
+  resourceNames: [{{ $i.customizations.configMapName | quote }}]
+  verbs: [get, patch]
+{{- end }}
+{{- if $i.uiExtension.enabled }}
+- apiGroups: [apps]
+  resources: [deployments]
+  resourceNames: [{{ $i.uiExtension.deploymentName | quote }}]
+  verbs: [get, patch]
+{{- if $i.uiExtension.installer.waitForRollout }}
+# kubectl rollout status lists and watches; resourceNames cannot scope list.
+- apiGroups: [apps]
+  resources: [deployments]
+  verbs: [list, watch]
+{{- end }}
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $hook }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "atc.argocd.hookLabels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $hook }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $hook }}
+  namespace: {{ .Release.Namespace }}
+---
+# Checking that the namespace exists needs a cluster-scoped get on it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $hook }}
+  labels:
+    {{- include "atc.argocd.hookLabels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: [namespaces]
+  resourceNames: [{{ $ns | quote }}]
+  verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $hook }}
+  labels:
+    {{- include "atc.argocd.hookLabels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $hook }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $hook }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $hook }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "atc.argocd.hookLabels" . | nindent 4 }}
+data:
+  argocd-cm-patch.yaml: |
+    {{- .Files.Get "files/argocd-cm-patch.yaml" | nindent 4 }}
+  integrate.sh: |
+    {{- .Files.Get "files/argocd-integrate.sh" | nindent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $hook }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "atc.argocd.hookLabels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ $i.hook.backoffLimit }}
+  activeDeadlineSeconds: {{ $i.hook.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ $i.hook.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "atc.argocd.hookLabels" . | nindent 8 }}
+      {{- with $i.hook.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ $hook }}
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $i.hook.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $i.hook.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: integrate
+        image: {{ $i.hook.image }}
+        imagePullPolicy: {{ $i.hook.imagePullPolicy }}
+        command: [sh, /scripts/integrate.sh, apply]
+        env:
+          {{- include "atc.argocd.hookEnv" . | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        {{- with $i.hook.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      volumes:
+      - name: scripts
+        configMap:
+          name: {{ $hook }}
+          defaultMode: 0444
+      - name: tmp
+        emptyDir: {}
+{{- if $i.cleanupOnUninstall }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $hook }}-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "atc.argocd.hookLabels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ $i.hook.backoffLimit }}
+  activeDeadlineSeconds: {{ $i.hook.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ $i.hook.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "atc.argocd.hookLabels" . | nindent 8 }}
+      {{- with $i.hook.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ $hook }}
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $i.hook.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $i.hook.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: cleanup
+        image: {{ $i.hook.image }}
+        imagePullPolicy: {{ $i.hook.imagePullPolicy }}
+        command: [sh, /scripts/integrate.sh, remove]
+        env:
+          {{- include "atc.argocd.hookEnv" . | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        {{- with $i.hook.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      volumes:
+      - name: scripts
+        configMap:
+          name: {{ $hook }}
+          defaultMode: 0444
+      - name: tmp
+        emptyDir: {}
+{{- end }}
+{{- end }}

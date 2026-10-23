@@ -72,8 +72,16 @@ CHART_DIR ?= charts/argocd-terraform-controller
 helm-sync-crds: manifests ## Copy the generated CRDs into the Helm chart.
 	cp config/crd/bases/*.yaml $(CHART_DIR)/crds/
 
+.PHONY: helm-sync-argocd
+helm-sync-argocd: argocd-cm ## Copy the generated Argo CD customizations (health/actions Lua) into the Helm chart.
+	mkdir -p $(CHART_DIR)/files
+	cp config/argocd/argocd-cm-patch.yaml $(CHART_DIR)/files/argocd-cm-patch.yaml
+
+.PHONY: helm-sync
+helm-sync: helm-sync-crds helm-sync-argocd ## Sync every generated artifact into the Helm chart.
+
 .PHONY: helm-lint
-helm-lint: helm-sync-crds ## Lint and render the Helm chart.
+helm-lint: helm-sync ## Lint and render the Helm chart.
 	$(HELM) lint $(CHART_DIR)
 	$(HELM) template test $(CHART_DIR) --namespace test --set runner.namespaces='{a,b}' > /dev/null
 

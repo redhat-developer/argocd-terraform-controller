@@ -45,5 +45,5 @@ jobs:
 
       - name: Verify generated files are up to date
         run: |
-          make manifests generate helm-sync-crds
+          make manifests generate helm-sync
           git diff --exit-code

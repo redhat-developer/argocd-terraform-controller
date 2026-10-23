@@ -41,6 +41,14 @@ spec:
 3. With `alwaysCleanup: true` (default) the Pod is deleted when the run ends,
    successfully or not. The next run starts a fresh Pod.
 
+> [!IMPORTANT]
+> The Pod's filesystem is **ephemeral**: the working directory and
+> `/home/runner` are `emptyDir` volumes that disappear with the Pod. Anything
+> the configuration writes to disk as a *managed resource* (`local_file`,
+> `local_sensitive_file`, files from `local-exec`) will be missing on the
+> next run and reported as drift every time. Hand such values out as
+> outputs instead; see [Drift that never goes away](drift-detection.md#drift-that-never-goes-away).
+
 With `alwaysCleanup: false` the Pod stays between runs and is reused, which
 saves the image pull and provider download on each reconcile (providers are
 cached in `TF_PLUGIN_CACHE_DIR=/tmp/plugin-cache` inside the Pod). The

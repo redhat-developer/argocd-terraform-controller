@@ -283,6 +283,10 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		tf.MarkUnknown(infrav1.ReadyCondition, infrav1.ProgressingReason, "Reconciliation in progress")
 	}
 
+	// Remember the outcome of the previous run before marking this one as
+	// in progress; clearStalePendingPlan uses it.
+	previousReason := readyReason(tf)
+
 	// Keep an Unknown Ready condition (e.g. the approval prompt) visible.
 	if ready := tf.GetCondition(infrav1.ReadyCondition); ready == nil || ready.Status != metav1.ConditionUnknown {
 		msg := "Reconciliation in progress"
@@ -300,7 +304,7 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if !isBeingDeleted(tf) {
-		r.clearStalePendingPlan(ctx, tf, revision)
+		r.clearStalePendingPlan(ctx, tf, revision, previousReason)
 		if tf.Status.Plan.Pending != "" && !r.forceOrAutoApply(tf) && !r.shouldApply(tf) {
 			log.Info("waiting for manual approval", "pendingPlan", tf.Status.Plan.Pending)
 			tf.DeleteCondition(infrav1.ReconcilingCondition)
@@ -338,17 +342,25 @@ func (r *TerraformReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	reconciled, reconcileErr := r.reconcile(ctx, patchHelper, runnerClient, tf.DeepCopy(), revision, loopID)
 	*tf = *reconciled
-	if reconcileErr == nil {
+	driftDetected := reconcileErr != nil && reconcileErr.Error() == infrav1.DriftDetectedReason
+	switch {
+	case reconcileErr == nil:
 		infrav1.TerraformResetRetry(tf)
 		tf.Status.LastSuccessfulReconcileAt = &metav1.Time{Time: time.Now()}
-	} else {
+	case driftDetected:
+		// Drift is a finding, not a failure: the run completed and observed
+		// that the infrastructure differs. Do not count it against
+		// remediation.retries or shorten the schedule to retryInterval.
+		infrav1.TerraformResetRetry(tf)
+	default:
 		tf.IncrementReconciliationFailures()
 	}
 
 	switch {
-	case reconcileErr != nil && reconcileErr.Error() == infrav1.DriftDetectedReason:
-		log.Info("drift detected", "elapsed", time.Since(start), "nextTry", tf.GetRetryInterval())
-		return ctrl.Result{RequeueAfter: tf.GetRetryInterval()}, nil
+	case driftDetected:
+		next := r.nextInterval(tf)
+		log.Info("drift detected", "elapsed", time.Since(start), "nextCheck", next)
+		return ctrl.Result{RequeueAfter: next}, nil
 	case reconcileErr != nil:
 		log.Error(reconcileErr, "reconciliation failed", "elapsed", time.Since(start), "nextTry", tf.GetRetryInterval())
 		r.Eventf(tf, corev1.EventTypeWarning, infrav1.ReconciliationFailureReason, "%s", reconcileErr.Error())
@@ -377,7 +389,7 @@ func (r *TerraformReconciler) nextInterval(tf *infrav1.Terraform) time.Duration 
 
 // clearStalePendingPlan drops a pending plan that no longer matches the
 // desired state so the next step re-plans.
-func (r *TerraformReconciler) clearStalePendingPlan(ctx context.Context, tf *infrav1.Terraform, revision string) {
+func (r *TerraformReconciler) clearStalePendingPlan(ctx context.Context, tf *infrav1.Terraform, revision, previousReason string) {
 	log := ctrl.LoggerFrom(ctx)
 	revisionChanged := revision != tf.Status.LastAttemptedRevision
 	requestedAt, hasRequest := tf.Annotations[ReconcileRequestAnnotation]
@@ -388,6 +400,12 @@ func (r *TerraformReconciler) clearStalePendingPlan(ctx context.Context, tf *inf
 		log.Info("reconcile requested with an unapproved pending plan, clearing it to re-plan")
 		tf.Status.Plan.Pending = ""
 		// Forget the last plan so the next run plans instead of detecting drift.
+		tf.Status.LastPlannedRevision = ""
+	case newRequest && tf.Status.Plan.Pending == "" && previousReason == infrav1.DriftDetectedReason:
+		// A manual reconcile request after drift was detected means "plan the
+		// remediation": forget the last plan so the run plans (producing an
+		// approvable plan) instead of only detecting the same drift again.
+		log.Info("reconcile requested after drift was detected, planning the remediation")
 		tf.Status.LastPlannedRevision = ""
 	case revisionChanged && !r.shouldApply(tf) && strings.HasPrefix(tf.Spec.ApprovePlan, "replan") &&
 		strings.HasPrefix("re"+tf.Status.Plan.Pending, tf.Spec.ApprovePlan):
@@ -431,6 +449,15 @@ func (r *TerraformReconciler) shouldReconcile(tf *infrav1.Terraform, revision st
 	if c := tf.GetCondition(infrav1.ReadyCondition); c != nil && c.Reason == infrav1.DependencyNotReadyReason {
 		return true, "previously blocked on a dependency", 0
 	}
+	// Detected drift waits for the regular interval, not the retry interval:
+	// re-checking sooner cannot change the outcome until a human (manual
+	// mode) or a new revision acts on it.
+	if readyReason(tf) == infrav1.DriftDetectedReason && tf.Status.LastDriftDetectedAt != nil {
+		if in := time.Until(tf.Status.LastDriftDetectedAt.Add(tf.Spec.Interval.Duration)); in > 0 {
+			return false, "drift detected, interval has not elapsed", min(in, r.sourcePollInterval(tf))
+		}
+		return true, "drift detected, interval elapsed", 0
+	}
 	if tf.Status.ReconciliationFailures > 0 && !tf.IsReady() {
 		if retryIn := time.Until(tf.Status.LastPlanAt.Add(tf.GetRetryInterval())); retryIn > 0 {
 			return false, "retry interval has not elapsed", retryIn
@@ -450,6 +477,14 @@ func (r *TerraformReconciler) shouldReconcile(tf *infrav1.Terraform, revision st
 type accessDeniedError struct{ msg string }
 
 func (e *accessDeniedError) Error() string { return e.msg }
+
+// readyReason returns the reason of the Ready condition, or "" when unset.
+func readyReason(tf *infrav1.Terraform) string {
+	if c := tf.GetCondition(infrav1.ReadyCondition); c != nil {
+		return c.Reason
+	}
+	return ""
+}
 
 func dependantsOf(tf *infrav1.Terraform) []string {
 	var out []string

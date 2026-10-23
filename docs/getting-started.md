@@ -1,44 +1,72 @@
 # Getting started
 
-Everything below is copy-and-paste-able and only needs `kubectl` pointed at a
-cluster that already runs Argo CD in the `argocd` namespace. Set the two
-variables first.
+Everything below is copy-and-paste-able and only needs `helm` and `kubectl`
+pointed at a cluster that already runs Argo CD in the `argocd` namespace. Set
+the two variables first.
 
 ```sh
-export VERSION=v0.0.6          # release of the Argo CD Terraform Controller
+export VERSION=v0.0.7          # release of the Argo CD Terraform Controller
 export TF_NAMESPACE=team-a     # namespace that will host Terraform objects
 ```
 
-## 1. Install the controller
+## 1. Install everything with Helm
 
-```sh
-kubectl apply -f https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/install.yaml
-kubectl -n argocd-terraform-controller-system rollout status deploy/argocd-terraform-controller-controller-manager
-```
-
-This creates the `Terraform` CRD, RBAC and the controller Deployment in
-`argocd-terraform-controller-system`. The Deployment carries two environment
-variables you may want to change later: `RUNNER_POD_IMAGE` (the runner image,
-which contains `terraform` and `tofu`) and `ARGOCD_NAMESPACE` (defaults to
-`argocd`, used to reuse Argo CD repository credentials).
-
-Alternatively, with Helm from the OCI chart:
+One command installs the controller, creates the runner identity in
+`${TF_NAMESPACE}`, and integrates with the Argo CD running in `argocd`
+(health assessment, resource actions and the UI extension):
 
 ```sh
 helm install argocd-terraform-controller \
   oci://quay.io/redhatworkshops/argocd-terraform-controller-helmchart --version ${VERSION#v} \
   --namespace argocd-terraform-controller-system --create-namespace \
-  --set runner.namespaces="{${TF_NAMESPACE}}"
+  --set runner.namespaces="{${TF_NAMESPACE}}" \
+  --wait
 ```
 
-## 2. Create the runner identity in the Terraform namespace
+The chart checks that Argo CD is present before doing anything and fails
+with instructions otherwise (Argo CD in another namespace:
+`--set argocd.namespace=<ns>`). A Helm hook patches `argocd-cm` and
+`argocd-server`, detecting the server container name automatically, and waits
+for `argocd-server` to roll out. `helm uninstall` reverts those patches.
+Every piece is a knob — see [Installation](operator-manual/installation.md).
 
-Runner Pods run as the `tf-runner` ServiceAccount of the Terraform object's
-namespace and need to write Secrets, ConfigMaps and Leases there (state,
-plans, outputs, locks). Repeat for every namespace that hosts Terraform
-objects (the Helm chart does this for `runner.namespaces`):
+## 2. Let the runner manage cluster resources (walkthrough only)
+
+The sample used below manages a Namespace and a ConfigMap with the Kubernetes
+provider, so for this walkthrough let `tf-runner` do that. Use a narrower
+ClusterRole in real deployments; cloud providers instead get credentials
+through `spec.runner.podTemplate.spec.env` / `envFrom`, workload identity or
+`spec.fileMappings` — see [Using cloud credentials](#using-cloud-credentials).
 
 ```sh
+kubectl create clusterrolebinding tf-runner-${TF_NAMESPACE}-sample \
+  --clusterrole=cluster-admin --serviceaccount=${TF_NAMESPACE}:tf-runner
+```
+
+## 3. Verify
+
+```sh
+kubectl -n argocd-terraform-controller-system get deploy
+kubectl -n ${TF_NAMESPACE} get serviceaccount tf-runner
+kubectl -n argocd get configmap argocd-cm -o jsonpath='{.data}' | grep -o 'infra.argocd.io_Terraform' | sort -u
+kubectl -n argocd exec deploy/argocd-server -- ls /tmp/extensions/resources/
+# extension-terraform.js
+```
+
+Argo CD loads extensions at startup and browsers cache them; hard-refresh the
+UI (Ctrl/Cmd+Shift+R) once `argocd-server` has rolled out.
+
+<details>
+<summary>Without Helm (plain manifests)</summary>
+
+The same three pieces, applied by hand from the release assets:
+
+```sh
+# Controller: CRD, RBAC, Deployment
+kubectl apply -f https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/install.yaml
+kubectl -n argocd-terraform-controller-system rollout status deploy/argocd-terraform-controller-controller-manager
+
+# Runner identity in the Terraform namespace (repeat per namespace)
 kubectl create namespace ${TF_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -n ${TF_NAMESPACE} -f - <<EOF
 apiVersion: v1
@@ -58,51 +86,24 @@ subjects:
 - kind: ServiceAccount
   name: tf-runner
 EOF
-```
 
-The sample used below manages a Namespace and a ConfigMap with the Kubernetes
-provider, so for this walkthrough also let `tf-runner` do that (use a narrower
-ClusterRole in real deployments; cloud providers instead get credentials through
-`spec.runner.podTemplate.spec.env` / `envFrom`, workload identity or `spec.fileMappings`):
-
-```sh
-kubectl create clusterrolebinding tf-runner-${TF_NAMESPACE}-sample \
-  --clusterrole=cluster-admin --serviceaccount=${TF_NAMESPACE}:tf-runner
-```
-
-## 3. Integrate with Argo CD
-
-Three configuration-only changes to a stock Argo CD (details in
-[Argo CD integration](operator-manual/argocd-integration.md)):
-
-```sh
-# Health assessment and resource actions (approve-plan, replan, suspend, resume, force-unlock)
+# Argo CD: health + actions
 kubectl patch configmap argocd-cm -n argocd --type merge \
   --patch "$(curl -fsSL https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/argocd-cm-patch.yaml)"
 
-# UI extension, installed by an init container on argocd-server. The patch
-# mounts the extension into the server container, whose name differs by
-# install method (upstream install.yaml: "argocd-server"; Helm chart: "server"),
-# so detect it and rewrite the patch to match.
+# Argo CD: UI extension. The server container is "argocd-server" (upstream
+# install.yaml) or "server" (Argo CD Helm chart); detect it and match it.
 SERVER_CONTAINER=$(kubectl get deploy argocd-server -n argocd -o jsonpath='{.spec.template.spec.containers[0].name}')
 curl -fsSL https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/argocd-server-extension-patch.yaml \
-  | sed "s/- name: argocd-server/- name: ${SERVER_CONTAINER}/" > /tmp/argocd-terraform-server-patch.yaml
-kubectl patch deployment argocd-server -n argocd --patch-file /tmp/argocd-terraform-server-patch.yaml
+  | sed "s/- name: argocd-server/- name: ${SERVER_CONTAINER}/" \
+  | kubectl patch deployment argocd-server -n argocd --patch-file /dev/stdin
 kubectl -n argocd rollout status deploy/argocd-server
 
 # Optional: let the controller reuse Argo CD repository credentials
 kubectl apply -n argocd -f https://raw.githubusercontent.com/redhat-developer/argocd-terraform-controller/${VERSION}/config/argocd/argocd_repo_reader_binding.yaml
 ```
 
-Verify the extension was installed:
-
-```sh
-kubectl -n argocd exec deploy/argocd-server -- ls /tmp/extensions/resources/
-# extension-terraform.js
-```
-
-Argo CD loads extensions at startup and browsers cache them; hard-refresh the
-UI (Ctrl/Cmd+Shift+R) after the rollout.
+</details>
 
 ## 4. Create an Application that syncs a Terraform object
 
@@ -183,8 +184,14 @@ kubectl patch terraform terraform-sample -n ${TF_NAMESPACE} --type merge -p "{\"
 ```sh
 kubectl delete application terraform-sample -n argocd --cascade=foreground   # prunes the Terraform object, which destroys terraform-demo
 kubectl delete clusterrolebinding tf-runner-${TF_NAMESPACE}-sample
-kubectl delete -f https://github.com/redhat-developer/argocd-terraform-controller/releases/download/${VERSION}/install.yaml
+helm uninstall argocd-terraform-controller -n argocd-terraform-controller-system   # also reverts the Argo CD patches
 ```
+
+Delete the Application first and wait for it to disappear: the destroy runs
+through the controller's finalizer, so the controller must still be installed
+when the Terraform object goes away. The `${TF_NAMESPACE}` namespace is kept
+(`helm.sh/resource-policy: keep`); remove it yourself if it was only for this
+walkthrough.
 
 ## Using cloud credentials
 

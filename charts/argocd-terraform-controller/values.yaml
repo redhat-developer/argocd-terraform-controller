@@ -14,6 +14,10 @@ runner:
   # Namespaces that host Terraform objects. A tf-runner ServiceAccount and
   # RoleBinding are created in each. The release namespace is always included.
   namespaces: []
+  # Create the namespaces listed above when they do not exist yet. Set to
+  # false if another tool owns them (Helm would otherwise adopt them and
+  # delete them on uninstall).
+  createNamespaces: true
   # Extra ClusterRole names to bind to every tf-runner ServiceAccount, e.g.
   # for configurations that manage cluster resources with the kubernetes
   # provider. Use with care.
@@ -55,6 +59,63 @@ argocd:
   # access to Secrets and ConfigMaps in argocd.namespace.
   repoCredentials:
     enabled: true
+
+  # Integrate with Argo CD automatically. Argo CD's own objects (argocd-cm,
+  # the argocd-server Deployment) are not owned by this chart, so a Helm hook
+  # Job patches them after install/upgrade and un-patches them before delete.
+  # Set enabled: false to do the integration yourself (for example from the
+  # Argo CD Helm chart's configs.cm / server.initContainers).
+  integration:
+    enabled: true
+    # Fail the install when Argo CD is not found in argocd.namespace (the
+    # namespace, the ConfigMap or the Deployment is missing). With false the
+    # hook logs a warning and the controller is installed without integration.
+    required: true
+    # Undo the patches when the release is uninstalled.
+    cleanupOnUninstall: true
+
+    # Health assessment and resource actions (Lua) merged into argocd-cm.
+    customizations:
+      enabled: true
+      configMapName: argocd-cm
+
+    # Argo CD UI extension (sidebar dashboard, tabs) installed through an
+    # argocd-extension-installer init container on argocd-server.
+    uiExtension:
+      enabled: true
+      deploymentName: argocd-server
+      # Container to mount the extension into. Detected automatically (the
+      # first container of the Deployment) when empty: the upstream
+      # install.yaml names it "argocd-server", the Argo CD Helm chart "server".
+      containerName: ""
+      # Release of this project to download the extension from. Defaults to
+      # the chart appVersion.
+      version: ""
+      # Full URLs override the release-derived defaults (air-gapped mirrors).
+      extensionURL: ""
+      checksumURL: ""
+      installer:
+        image: quay.io/argoprojlabs/argocd-extension-installer:v0.0.9@sha256:d2b43c18ac1401f579f6d27878f45e253d1e3f30287471ae74e6a4315ceb0611
+        # Wait for argocd-server to finish rolling out after the patch.
+        waitForRollout: true
+        rolloutTimeout: 5m
+
+    # The hook Job that performs the integration.
+    hook:
+      image: docker.io/alpine/k8s:1.34.1@sha256:ec714df3813b5405292860f8a1c55c5727bf8c33c88992f1e981efad8065547f
+      imagePullPolicy: IfNotPresent
+      backoffLimit: 3
+      activeDeadlineSeconds: 600
+      ttlSecondsAfterFinished: 600
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+      nodeSelector: {}
+      tolerations: []
+      podAnnotations: {}
 
 mtls:
   caValidityDuration: 168h

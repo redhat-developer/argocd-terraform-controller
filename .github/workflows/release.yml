@@ -49,7 +49,7 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          make helm-sync-crds
+          make helm-sync
           helm package charts/argocd-terraform-controller --version "${TAG#v}" --app-version "${TAG#v}" --destination dist
 
       # QUAY_USERNAME / QUAY_PASSWORD: the same Quay robot used for the images,

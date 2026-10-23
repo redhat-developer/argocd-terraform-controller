@@ -14,6 +14,19 @@ rules:
   resources: [leases]
   verbs: [get, list, watch, create, update, patch, delete]
 {{- range $ns := include "atc.runnerNamespaces" . | fromJsonArray }}
+{{- if and $.Values.runner.createNamespaces (ne $ns $.Release.Namespace) }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  labels:
+    {{- include "atc.labels" $ | nindent 4 }}
+  annotations:
+    # Keep the namespace (and whatever teams put in it) when the release is
+    # uninstalled; only the runner identity inside it is removed.
+    helm.sh/resource-policy: keep
+{{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount
