@@ -5,7 +5,7 @@ pointed at a cluster that already runs Argo CD in the `argocd` namespace. Set
 the two variables first.
 
 ```sh
-export VERSION=v0.0.7          # release of the Argo CD Terraform Controller
+export VERSION=v0.0.8          # release of the Argo CD Terraform Controller
 export TF_NAMESPACE=team-a     # namespace that will host Terraform objects
 ```
 

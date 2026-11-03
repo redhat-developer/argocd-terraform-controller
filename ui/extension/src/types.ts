@@ -72,14 +72,16 @@ export interface ConfigMap {
 }
 
 // Argo CD resource tree node (ui/src/app/shared/models.ts ResourceNode).
+// The API server omits `group` for core-group resources (ConfigMap, Secret,
+// Pod, ...), so it is undefined rather than "" at runtime.
 export interface ResourceNode {
-  group: string;
+  group?: string;
   kind: string;
   version: string;
   name: string;
   namespace: string;
   uid?: string;
-  parentRefs?: { group: string; kind: string; name: string; namespace: string; uid?: string }[];
+  parentRefs?: { group?: string; kind: string; name: string; namespace: string; uid?: string }[];
   health?: { status: string; message?: string };
 }
 
@@ -91,7 +93,7 @@ export interface Application {
   metadata: ObjectMeta;
   spec: { project: string };
   status?: {
-    resources?: { group: string; kind: string; name: string; namespace: string }[];
+    resources?: { group?: string; kind: string; name: string; namespace: string }[];
   };
 }
 

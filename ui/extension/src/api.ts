@@ -16,7 +16,7 @@ function resourceParams(app: Application, res: Pick<ResourceNode, 'group' | 'kin
     resourceName: res.name,
     version: res.version,
     kind: res.kind,
-    group: res.group,
+    group: res.group ?? '',
   });
   if (app.metadata.namespace) {
     params.set('appNamespace', app.metadata.namespace);
@@ -64,7 +64,7 @@ export async function getReadablePlan(app: Application, tree: { nodes: ResourceN
   const namespace = tf.metadata.namespace ?? '';
   // Large plans are chunked into <name>-0, <name>-1, ...; find them in the tree.
   const chunks = tree.nodes
-    .filter((n) => n.kind === 'ConfigMap' && n.group === '' && n.namespace === namespace && (n.name === name || n.name.startsWith(`${name}-`)))
+    .filter((n) => n.kind === 'ConfigMap' && !n.group && n.namespace === namespace && (n.name === name || n.name.startsWith(`${name}-`)))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   if (chunks.length === 0) {
     return null;

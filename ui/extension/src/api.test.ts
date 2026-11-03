@@ -55,6 +55,28 @@ describe('api', () => {
     expect(await getReadablePlan(app, { nodes }, tf)).toBe('first second');
   });
 
+  it('finds the readable plan when the tree omits group for core resources', async () => {
+    // The Argo CD API drops the empty `group` field for core-group kinds.
+    const tf: Terraform = {
+      apiVersion: 'infra.argocd.io/v1alpha1',
+      kind: 'Terraform',
+      metadata: { name: 'db', namespace: 'team-a' },
+      spec: {},
+      status: { planConfigMapName: 'tfplan-default-db-readable' },
+    };
+    const nodes: ResourceNode[] = [
+      { kind: 'ConfigMap', version: 'v1', name: 'tfplan-default-db-readable', namespace: 'team-a' },
+      { kind: 'Secret', version: 'v1', name: 'tfplan-default-db', namespace: 'team-a' },
+      { group: 'infra.argocd.io', kind: 'Terraform', version: 'v1alpha1', name: 'db', namespace: 'team-a' },
+    ];
+    const fetch = mockFetch(() => ({ manifest: JSON.stringify({ metadata: { name: 'tfplan-default-db-readable' }, data: { tfplan: 'plan text' } }) }));
+    expect(await getReadablePlan(app, { nodes }, tf)).toBe('plan text');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const url = new URL(String(fetch.mock.calls[0][0]), 'http://argocd');
+    expect(url.searchParams.get('group')).toBe('');
+    expect(url.searchParams.get('kind')).toBe('ConfigMap');
+  });
+
   it('posts resource actions as a JSON string', async () => {
     const tf: Terraform = { apiVersion: 'infra.argocd.io/v1alpha1', kind: 'Terraform', metadata: { name: 'db', namespace: 'team-a' }, spec: {} };
     const fetch = mockFetch(() => ({}));
