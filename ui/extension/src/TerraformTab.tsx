@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import { getReadablePlan, getTerraform } from './api';
 import { Actions, Badge, Field, Message, PlanOutput, usePolling } from './components';
@@ -49,6 +49,8 @@ export function TerraformDetails({ application, tf, plan, onChanged, hideInvento
   const ready = condition(tf, 'Ready');
   const pending = status.plan?.pending;
   const summary = plan ? planSummary(plan) : null;
+  // Large plans can take over the panel; the user can fold the output away.
+  const [planCollapsed, setPlanCollapsed] = useState(false);
 
   return (
     <div className="tf-ext">
@@ -94,9 +96,21 @@ export function TerraformDetails({ application, tf, plan, onChanged, hideInvento
           {pending && <span className="tf-ext__chip">{pending}</span>}
           {status.plan?.isDestroyPlan && <span className="tf-ext__badge tf-ext__badge--Degraded">destroy</span>}
           {summary && <span className="tf-ext__muted">{summary}</span>}
+          {plan && (
+            <button
+              type="button"
+              className="tf-ext__toggle"
+              aria-expanded={!planCollapsed}
+              aria-label={planCollapsed ? 'Show plan' : 'Hide plan'}
+              title={planCollapsed ? 'Show plan' : 'Hide plan'}
+              onClick={() => setPlanCollapsed((c) => !c)}
+            >
+              {planCollapsed ? '▸' : '▾'}
+            </button>
+          )}
         </h4>
         {plan ? (
-          <PlanOutput plan={plan} />
+          !planCollapsed && <PlanOutput plan={plan} />
         ) : (
           <div className="tf-ext__muted">
             {pending

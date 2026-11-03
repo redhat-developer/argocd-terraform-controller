@@ -81,6 +81,20 @@
 .tf-ext__section { margin-top: 20px; }
 .tf-ext__section-title { font-size: 14px; font-weight: 600; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
 
+.tf-ext__toggle {
+  border: 1px solid #d6dde3;
+  background: #fff;
+  color: #6d7f8b;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tf-ext__toggle:hover { background: #e8f7fd; border-color: #0dadea; color: #0dadea; }
+
 .tf-ext__plan {
   background: #1f2937;
   color: #e5e7eb;

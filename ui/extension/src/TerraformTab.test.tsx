@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import TerraformTab from './TerraformTab';
+import TerraformTab, { TerraformDetails } from './TerraformTab';
 import type { Application, Terraform } from './types';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -40,5 +40,28 @@ describe('TerraformTab', () => {
       />,
     );
     expect(await screen.findByText('team-a/db')).toBeTruthy();
+  });
+
+  it('lets the user collapse and expand the plan output', () => {
+    const plan = '  # aws_instance.app will be created\nPlan: 1 to add, 0 to change, 0 to destroy.';
+    render(<TerraformDetails application={application} tf={tf} plan={plan} onChanged={() => undefined} />);
+
+    expect(screen.getByText('# aws_instance.app will be created', { exact: false })).toBeTruthy();
+    const toggle = screen.getByRole('button', { name: 'Hide plan' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(toggle);
+    expect(screen.queryByText('# aws_instance.app will be created', { exact: false })).toBeNull();
+    expect(screen.getByText('Plan: 1 to add, 0 to change, 0 to destroy.')).toBeTruthy(); // summary stays in the title
+    expect(screen.getByRole('button', { name: 'Show plan' }).getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show plan' }));
+    expect(screen.getByText('# aws_instance.app will be created', { exact: false })).toBeTruthy();
+  });
+
+  it('shows no toggle when there is no plan', () => {
+    render(<TerraformDetails application={application} tf={tf} plan={null} onChanged={() => undefined} />);
+    expect(screen.queryByRole('button', { name: 'Hide plan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show plan' })).toBeNull();
   });
 });
