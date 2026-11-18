@@ -1,4 +1,0 @@
-## Append samples of your project ##
-resources:
-- infra_v1alpha1_terraform.yaml
-# +kubebuilder:scaffold:manifestskustomizesamples
